@@ -73,12 +73,10 @@ func BuildDeployment(instance *openclawv1alpha1.OpenClawInstance) *appsv1.Deploy
 	}
 
 	// Add image pull secrets
-	for _, secret := range instance.Spec.Image.PullSecrets {
-		deployment.Spec.Template.Spec.ImagePullSecrets = append(
-			deployment.Spec.Template.Spec.ImagePullSecrets,
-			secret,
-		)
-	}
+	deployment.Spec.Template.Spec.ImagePullSecrets = append(
+		deployment.Spec.Template.Spec.ImagePullSecrets,
+		instance.Spec.Image.PullSecrets...,
+	)
 
 	return deployment
 }
