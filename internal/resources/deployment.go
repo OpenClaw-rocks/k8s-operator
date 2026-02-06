@@ -184,7 +184,9 @@ func buildMainContainer(instance *openclawv1alpha1.OpenClawInstance) corev1.Cont
 				Protocol:      corev1.ProtocolTCP,
 			},
 		},
-		Env:       instance.Spec.Env,
+		Env: append([]corev1.EnvVar{
+			{Name: "HOME", Value: "/home/openclaw"},
+		}, instance.Spec.Env...),
 		EnvFrom:   instance.Spec.EnvFrom,
 		Resources: buildResourceRequirements(instance),
 		VolumeMounts: []corev1.VolumeMount{
