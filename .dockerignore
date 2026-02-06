@@ -1,0 +1,39 @@
+# Version control
+.git
+.gitignore
+
+# CI/CD
+.github
+
+# Documentation
+*.md
+docs/
+LICENSE
+CONTRIBUTING.md
+
+# Development
+.golangci.yaml
+.editorconfig
+.vscode/
+.idea/
+
+# Build artifacts
+bin/
+cover.out
+*.out
+
+# Helm chart (not needed in operator image)
+charts/
+
+# Test artifacts
+test/
+*_test.go
+
+# Config samples
+config/samples/
+
+# Temporary files
+*.swp
+*.swo
+*~
+.DS_Store

@@ -1,0 +1,46 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: openclaw-operator-alerts
+  labels:
+    app.kubernetes.io/name: openclaw
+    app.kubernetes.io/managed-by: openclaw-operator
+spec:
+  groups:
+    - name: openclaw-operator
+      rules:
+        - alert: OpenClawReconcileErrors
+          expr: |
+            sum(rate(openclaw_reconcile_total{result="error"}[5m])) by (instance, namespace) > 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "OpenClaw reconciliation errors detected"
+            description: >-
+              OpenClaw instance {{ $labels.instance }} in namespace {{ $labels.namespace }}
+              has been experiencing reconciliation errors for more than 5 minutes.
+
+        - alert: OpenClawInstanceDegraded
+          expr: |
+            openclaw_instance_phase{phase=~"Failed|Degraded"} == 1
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "OpenClaw instance is in {{ $labels.phase }} phase"
+            description: >-
+              OpenClaw instance {{ $labels.instance }} in namespace {{ $labels.namespace }}
+              has been in {{ $labels.phase }} phase for more than 5 minutes.
+
+        - alert: OpenClawSlowReconciliation
+          expr: |
+            histogram_quantile(0.99, sum(rate(openclaw_reconcile_duration_seconds_bucket[5m])) by (le, instance, namespace)) > 30
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "OpenClaw reconciliation is slow"
+            description: >-
+              The p99 reconciliation duration for OpenClaw instance {{ $labels.instance }}
+              in namespace {{ $labels.namespace }} has exceeded 30 seconds for more than 5 minutes.

@@ -29,6 +29,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -70,9 +71,15 @@ type OpenClawInstanceReconciler struct {
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=monitoring.coreos.com,resources=servicemonitors,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop
 func (r *OpenClawInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	reconcileStart := time.Now()
+	defer func() {
+		reconcileDuration.WithLabelValues(req.Name, req.Namespace).Observe(time.Since(reconcileStart).Seconds())
+	}()
+
 	logger := log.FromContext(ctx)
 	logger.Info("Reconciling OpenClawInstance")
 
@@ -133,11 +140,19 @@ func (r *OpenClawInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Req
 			LastTransitionTime: metav1.Now(),
 		})
 		instance.Status.Phase = openclawv1alpha1.PhaseFailed
+		reconcileTotal.WithLabelValues(instance.Name, instance.Namespace, "error").Inc()
+		updatePhaseMetric(instance.Name, instance.Namespace, instance.Status.Phase)
 		if statusErr := r.Status().Update(ctx, instance); statusErr != nil {
 			logger.Error(statusErr, "Failed to update status")
 		}
 
-		return ctrl.Result{RequeueAfter: time.Minute}, err
+		// Use shorter requeue for transient errors, longer for persistent ones
+		requeueAfter := 30 * time.Second
+		if instance.Status.Phase == openclawv1alpha1.PhaseFailed {
+			// If already in failed state, back off more
+			requeueAfter = 2 * time.Minute
+		}
+		return ctrl.Result{RequeueAfter: requeueAfter}, err
 	}
 
 	// Update status to Running
@@ -158,10 +173,24 @@ func (r *OpenClawInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, err
 	}
 
+	reconcileTotal.WithLabelValues(instance.Name, instance.Namespace, "success").Inc()
+	updatePhaseMetric(instance.Name, instance.Namespace, instance.Status.Phase)
+
 	r.Recorder.Event(instance, corev1.EventTypeNormal, "ReconcileSucceeded", "All resources reconciled successfully")
 	logger.Info("Reconciliation completed successfully")
 
 	return ctrl.Result{RequeueAfter: RequeueAfter}, nil
+}
+
+func updatePhaseMetric(name, namespace, currentPhase string) {
+	phases := []string{"Pending", "Provisioning", "Running", "Degraded", "Failed", "Terminating"}
+	for _, phase := range phases {
+		val := float64(0)
+		if phase == currentPhase {
+			val = 1
+		}
+		instancePhase.WithLabelValues(name, namespace, phase).Set(val)
+	}
 }
 
 // reconcileResources reconciles all managed resources
@@ -215,6 +244,12 @@ func (r *OpenClawInstanceReconciler) reconcileResources(ctx context.Context, ins
 		return fmt.Errorf("failed to reconcile Ingress: %w", err)
 	}
 	logger.V(1).Info("Ingress reconciled")
+
+	// 9. Reconcile ServiceMonitor (if enabled)
+	if err := r.reconcileServiceMonitor(ctx, instance); err != nil {
+		return fmt.Errorf("failed to reconcile ServiceMonitor: %w", err)
+	}
+	logger.V(1).Info("ServiceMonitor reconciled")
 
 	return nil
 }
@@ -498,10 +533,47 @@ func (r *OpenClawInstanceReconciler) reconcileIngress(ctx context.Context, insta
 	return nil
 }
 
+// reconcileServiceMonitor reconciles the ServiceMonitor for Prometheus
+func (r *OpenClawInstanceReconciler) reconcileServiceMonitor(ctx context.Context, instance *openclawv1alpha1.OpenClawInstance) error {
+	// Check if ServiceMonitor is enabled
+	if instance.Spec.Observability.Metrics.ServiceMonitor == nil ||
+		instance.Spec.Observability.Metrics.ServiceMonitor.Enabled == nil ||
+		!*instance.Spec.Observability.Metrics.ServiceMonitor.Enabled {
+		return nil
+	}
+
+	sm := resources.BuildServiceMonitor(instance)
+	sm.SetNamespace(instance.Namespace)
+
+	// Set owner reference manually for unstructured
+	ownerRef := metav1.OwnerReference{
+		APIVersion: instance.APIVersion,
+		Kind:       instance.Kind,
+		Name:       instance.Name,
+		UID:        instance.UID,
+		Controller: resources.Ptr(true),
+	}
+	sm.SetOwnerReferences([]metav1.OwnerReference{ownerRef})
+
+	// Create or update
+	existing := &unstructured.Unstructured{}
+	existing.SetGroupVersionKind(sm.GroupVersionKind())
+	if err := r.Get(ctx, client.ObjectKeyFromObject(sm), existing); err != nil {
+		if apierrors.IsNotFound(err) {
+			return r.Create(ctx, sm)
+		}
+		return err
+	}
+	sm.SetResourceVersion(existing.GetResourceVersion())
+	return r.Update(ctx, sm)
+}
+
 // reconcileDelete handles cleanup when the instance is being deleted
+//
+//nolint:unparam // result is always zero-value but signature kept for consistency with Reconcile return pattern
 func (r *OpenClawInstanceReconciler) reconcileDelete(ctx context.Context, instance *openclawv1alpha1.OpenClawInstance) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
-	logger.Info("Handling deletion")
+	logger.Info("Handling deletion", "instance", instance.Name, "namespace", instance.Namespace)
 
 	// Update phase
 	instance.Status.Phase = openclawv1alpha1.PhaseTerminating

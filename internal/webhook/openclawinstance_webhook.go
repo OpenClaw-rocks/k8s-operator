@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -37,6 +38,7 @@ var _ webhook.CustomValidator = &OpenClawInstanceValidator{}
 func SetupWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(&openclawv1alpha1.OpenClawInstance{}).
+		WithDefaulter(&OpenClawInstanceDefaulter{}).
 		WithValidator(&OpenClawInstanceValidator{}).
 		Complete()
 }
@@ -129,4 +131,78 @@ func (v *OpenClawInstanceValidator) validate(instance *openclawv1alpha1.OpenClaw
 	}
 
 	return warnings, nil
+}
+
+// OpenClawInstanceDefaulter sets defaults for OpenClawInstance resources
+type OpenClawInstanceDefaulter struct{}
+
+var _ webhook.CustomDefaulter = &OpenClawInstanceDefaulter{}
+
+// Default implements webhook.CustomDefaulter
+func (d *OpenClawInstanceDefaulter) Default(ctx context.Context, obj runtime.Object) error {
+	instance := obj.(*openclawv1alpha1.OpenClawInstance)
+
+	// Default image settings
+	if instance.Spec.Image.Repository == "" {
+		instance.Spec.Image.Repository = "ghcr.io/openclaw/openclaw"
+	}
+	if instance.Spec.Image.Tag == "" && instance.Spec.Image.Digest == "" {
+		instance.Spec.Image.Tag = "latest"
+	}
+	if instance.Spec.Image.PullPolicy == "" {
+		instance.Spec.Image.PullPolicy = corev1.PullIfNotPresent
+	}
+
+	// Default security settings
+	if instance.Spec.Security.PodSecurityContext == nil {
+		instance.Spec.Security.PodSecurityContext = &openclawv1alpha1.PodSecurityContextSpec{
+			RunAsUser:    int64Ptr(1000),
+			RunAsGroup:   int64Ptr(1000),
+			FSGroup:      int64Ptr(1000),
+			RunAsNonRoot: boolPtr(true),
+		}
+	}
+	if instance.Spec.Security.ContainerSecurityContext == nil {
+		instance.Spec.Security.ContainerSecurityContext = &openclawv1alpha1.ContainerSecurityContextSpec{
+			AllowPrivilegeEscalation: boolPtr(false),
+			ReadOnlyRootFilesystem:   boolPtr(false),
+		}
+	}
+
+	// Default resource limits if not set
+	if instance.Spec.Resources.Requests.CPU == "" {
+		instance.Spec.Resources.Requests.CPU = "500m"
+	}
+	if instance.Spec.Resources.Requests.Memory == "" {
+		instance.Spec.Resources.Requests.Memory = "1Gi"
+	}
+	if instance.Spec.Resources.Limits.CPU == "" {
+		instance.Spec.Resources.Limits.CPU = "2000m"
+	}
+	if instance.Spec.Resources.Limits.Memory == "" {
+		instance.Spec.Resources.Limits.Memory = "4Gi"
+	}
+
+	// Default storage
+	if instance.Spec.Storage.Persistence.Enabled == nil {
+		instance.Spec.Storage.Persistence.Enabled = boolPtr(true)
+	}
+	if instance.Spec.Storage.Persistence.Size == "" {
+		instance.Spec.Storage.Persistence.Size = "10Gi"
+	}
+
+	// Default networking
+	if instance.Spec.Networking.Service.Type == "" {
+		instance.Spec.Networking.Service.Type = corev1.ServiceTypeClusterIP
+	}
+
+	return nil
+}
+
+func boolPtr(b bool) *bool {
+	return &b
+}
+
+func int64Ptr(i int64) *int64 {
+	return &i
 }
