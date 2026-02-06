@@ -9,7 +9,6 @@ on:
 env:
   GO_VERSION: '1.24'
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   lint:
@@ -80,6 +79,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Lowercase image name
+        id: image
+        run: echo "name=${GITHUB_REPOSITORY,,}" >> $GITHUB_OUTPUT
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -95,7 +98,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}
           tags: |
             type=sha,prefix=
             type=ref,event=branch
@@ -125,6 +128,10 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
+      - name: Lowercase image name
+        id: image
+        run: echo "name=${GITHUB_REPOSITORY,,}" >> $GITHUB_OUTPUT
+
       - name: Create kind cluster
         uses: helm/kind-action@v1
 
@@ -133,7 +140,7 @@ jobs:
 
       - name: Deploy operator
         run: |
-          make deploy IMG=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          make deploy IMG=${{ env.REGISTRY }}/${{ steps.image.outputs.name }}:${{ github.sha }}
 
       - name: Wait for operator
         run: |
