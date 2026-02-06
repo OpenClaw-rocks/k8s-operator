@@ -317,6 +317,11 @@ func TestBuildDeployment_Defaults(t *testing.T) {
 		t.Error("container security context: seccomp profile should be RuntimeDefault")
 	}
 
+	// HOME env var must be set to match the mount path
+	if len(main.Env) < 1 || main.Env[0].Name != "HOME" || main.Env[0].Value != "/home/openclaw" {
+		t.Error("HOME env var should be set to /home/openclaw")
+	}
+
 	// Ports
 	if len(main.Ports) != 2 {
 		t.Fatalf("expected 2 ports, got %d", len(main.Ports))
@@ -840,8 +845,8 @@ func TestBuildDeployment_EnvAndEnvFrom(t *testing.T) {
 	dep := BuildDeployment(instance)
 	main := dep.Spec.Template.Spec.Containers[0]
 
-	if len(main.Env) != 1 || main.Env[0].Name != "MY_VAR" {
-		t.Error("env vars not passed through")
+	if len(main.Env) != 2 || main.Env[0].Name != "HOME" || main.Env[1].Name != "MY_VAR" {
+		t.Error("env vars should include HOME followed by user-defined vars")
 	}
 	if len(main.EnvFrom) != 1 || main.EnvFrom[0].SecretRef.Name != "api-keys" {
 		t.Error("envFrom not passed through")
