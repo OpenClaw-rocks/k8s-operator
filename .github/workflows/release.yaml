@@ -28,10 +28,6 @@ jobs:
         with:
           go-version: '1.24'
 
-      - name: Lowercase image name
-        id: image
-        run: echo "name=${GITHUB_REPOSITORY,,}" >> $GITHUB_OUTPUT
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -45,59 +41,64 @@ jobs:
       - name: Install Cosign
         uses: sigstore/cosign-installer@v3
 
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v6
         with:
-          images: ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-            type=sha
-
-      - name: Build and push Docker image
-        id: build-and-push
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Sign the container image
+          version: '~> v2'
+          args: release --clean
         env:
-          DIGEST: ${{ steps.build-and-push.outputs.digest }}
-          TAGS: ${{ steps.meta.outputs.tags }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker image name
+        id: docker-image
         run: |
-          images=""
-          for tag in ${TAGS}; do
-            images+="${tag}@${DIGEST} "
+          OWNER="${GITHUB_REPOSITORY_OWNER,,}"
+          echo "name=${{ env.REGISTRY }}/${OWNER}/openclaw-operator" >> $GITHUB_OUTPUT
+
+      - name: Sign container images
+        run: |
+          IMAGE="${{ steps.docker-image.outputs.name }}"
+          # Extract major.minor matching goreleaser's {{ .Major }}.{{ .Minor }}
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+          MAJOR=$(echo "$VERSION" | cut -d. -f1)
+          MINOR=$(echo "$VERSION" | cut -d. -f2)
+          TAGS=("latest" "${{ github.ref_name }}" "${MAJOR}.${MINOR}")
+
+          for tag in "${TAGS[@]}"; do
+            echo "Signing ${IMAGE}:${tag}..."
+            DIGEST=$(docker buildx imagetools inspect "${IMAGE}:${tag}" --format '{{json .Manifest}}' | jq -r '.digest')
+            if [ -n "$DIGEST" ] && [ "$DIGEST" != "null" ]; then
+              cosign sign --yes "${IMAGE}:${tag}@${DIGEST}"
+            else
+              echo "Warning: could not resolve digest for ${IMAGE}:${tag}, skipping"
+            fi
           done
-          cosign sign --yes ${images}
 
       - name: Generate SBOM
         uses: anchore/sbom-action@v0
         with:
-          image: ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}@${{ steps.build-and-push.outputs.digest }}
+          image: ${{ steps.docker-image.outputs.name }}:${{ github.ref_name }}
           format: spdx-json
           output-file: sbom.spdx.json
           upload-release-assets: false
 
       - name: Attest SBOM
         run: |
+          IMAGE="${{ steps.docker-image.outputs.name }}"
+          DIGEST=$(docker buildx imagetools inspect "${IMAGE}:${{ github.ref_name }}" --format '{{json .Manifest}}' | jq -r '.digest')
           cosign attest --yes --predicate sbom.spdx.json --type spdxjson \
-            ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}@${{ steps.build-and-push.outputs.digest }}
+            "${IMAGE}@${DIGEST}"
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
-        with:
-          generate_release_notes: true
-          files: |
-            sbom.spdx.json
+      - name: Upload SBOM to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ github.ref_name }}" sbom.spdx.json --clobber
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit "${{ github.ref_name }}" --draft=false
 
   helm-release:
     name: Helm Chart Release

@@ -1,0 +1,73 @@
+version: 2
+
+project_name: openclaw-operator
+
+builds:
+  - id: manager
+    main: ./cmd/main.go
+    binary: manager
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+
+dockers_v2:
+  - id: openclaw-operator
+    dockerfile: Dockerfile
+    ids:
+      - manager
+    images:
+      - "ghcr.io/openclaw-rocks/openclaw-operator"
+    tags:
+      - "{{ .Tag }}"
+      - "{{ .Major }}.{{ .Minor }}"
+      - "latest"
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    labels:
+      "org.opencontainers.image.title": "{{ .ProjectName }}"
+      "org.opencontainers.image.version": "{{ .Version }}"
+      "org.opencontainers.image.revision": "{{ .FullCommit }}"
+      "org.opencontainers.image.created": "{{ .Date }}"
+      "org.opencontainers.image.source": "{{ .GitURL }}"
+    build_args:
+      PREBUILT_BINARY: "manager"
+    extra_files:
+      - cmd/
+      - api/
+      - internal/
+      - go.mod
+      - go.sum
+
+archives:
+  - id: binaries
+    formats:
+      - tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
+      - "^chore:"
+
+release:
+  draft: true
+  github:
+    owner: openclaw-rocks
+    name: k8s-operator
