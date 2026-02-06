@@ -111,17 +111,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Lowercase owner name
         id: owner
         run: echo "name=${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_OUTPUT
-
-      - name: Configure Git
-        run: |
-          git config user.name "$GITHUB_ACTOR"
-          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
 
       - name: Install Helm
         uses: azure/setup-helm@v4
@@ -146,10 +139,3 @@ jobs:
         run: |
           helm package charts/openclaw-operator
           helm push openclaw-operator-${{ steps.version.outputs.version }}.tgz oci://ghcr.io/${{ steps.owner.outputs.name }}/charts
-
-      - name: Run chart-releaser
-        uses: helm/chart-releaser-action@v1.6.0
-        with:
-          charts_dir: charts
-        env:
-          CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
