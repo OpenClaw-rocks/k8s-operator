@@ -135,16 +135,36 @@ jobs:
       - name: Create kind cluster
         uses: helm/kind-action@v1
 
+      - name: Build operator image for kind
+        run: |
+          docker build -t ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}:e2e .
+
+      - name: Load image into kind
+        run: |
+          kind load docker-image ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}:e2e
+
       - name: Install CRDs
         run: make install
 
       - name: Deploy operator
         run: |
-          make deploy IMG=${{ env.REGISTRY }}/${{ steps.image.outputs.name }}:${{ github.sha }}
+          make deploy IMG=${{ env.REGISTRY }}/${{ steps.image.outputs.name }}:e2e
 
       - name: Wait for operator
         run: |
-          kubectl wait --for=condition=available --timeout=120s deployment/openclaw-operator-controller-manager -n openclaw-operator-system
+          kubectl wait --for=condition=available --timeout=180s deployment/openclaw-operator-controller-manager -n openclaw-operator-system
+
+      - name: Debug operator status
+        if: failure()
+        run: |
+          echo "=== Deployment status ==="
+          kubectl get deployment -n openclaw-operator-system
+          echo "=== Pod status ==="
+          kubectl get pods -n openclaw-operator-system
+          echo "=== Pod logs ==="
+          kubectl logs -n openclaw-operator-system -l control-plane=controller-manager --tail=100 || true
+          echo "=== Pod describe ==="
+          kubectl describe pods -n openclaw-operator-system || true
 
       - name: Run E2E tests
         run: make test-e2e
