@@ -1,5 +1,9 @@
 # OpenClaw Kubernetes Operator
 
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Go Report Card](https://goreportcard.com/badge/github.com/openclawrocks/k8s-operator)](https://goreportcard.com/report/github.com/openclawrocks/k8s-operator)
+[![CI](https://github.com/OpenClaw-rocks/k8s-operator/actions/workflows/ci.yaml/badge.svg)](https://github.com/OpenClaw-rocks/k8s-operator/actions/workflows/ci.yaml)
+
 A production-grade Kubernetes operator for deploying and managing OpenClaw AI assistant instances.
 
 ## Features
@@ -229,6 +233,12 @@ status:
   canvasEndpoint: my-openclaw.default.svc:18793
 ```
 
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
+
 ## License
 
-Apache License 2.0
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+
+This is the same license used by Kubernetes, Prometheus, and most CNCF projects, ensuring maximum compatibility and enterprise adoption.
