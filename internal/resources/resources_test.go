@@ -422,6 +422,22 @@ func TestBuildDeployment_WithChromium(t *testing.T) {
 		t.Fatal("chromium container not found")
 	}
 
+	// Main container should have CHROMIUM_URL env var
+	mainContainer := containers[0]
+	foundChromiumURL := false
+	for _, env := range mainContainer.Env {
+		if env.Name == "CHROMIUM_URL" {
+			foundChromiumURL = true
+			if env.Value != "ws://localhost:9222" {
+				t.Errorf("CHROMIUM_URL = %q, want %q", env.Value, "ws://localhost:9222")
+			}
+			break
+		}
+	}
+	if !foundChromiumURL {
+		t.Error("main container should have CHROMIUM_URL env var when chromium is enabled")
+	}
+
 	// Chromium image defaults
 	if chromium.Image != "ghcr.io/browserless/chromium:latest" {
 		t.Errorf("chromium image = %q, want default", chromium.Image)

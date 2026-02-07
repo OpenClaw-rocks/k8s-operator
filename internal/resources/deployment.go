@@ -184,9 +184,7 @@ func buildMainContainer(instance *openclawv1alpha1.OpenClawInstance) corev1.Cont
 				Protocol:      corev1.ProtocolTCP,
 			},
 		},
-		Env: append([]corev1.EnvVar{
-			{Name: "HOME", Value: "/home/openclaw"},
-		}, instance.Spec.Env...),
+		Env: buildMainEnv(instance),
 		EnvFrom:   instance.Spec.EnvFrom,
 		Resources: buildResourceRequirements(instance),
 		VolumeMounts: []corev1.VolumeMount{
@@ -222,6 +220,22 @@ func buildMainContainer(instance *openclawv1alpha1.OpenClawInstance) corev1.Cont
 	container.StartupProbe = buildStartupProbe(instance)
 
 	return container
+}
+
+// buildMainEnv creates the environment variables for the main container
+func buildMainEnv(instance *openclawv1alpha1.OpenClawInstance) []corev1.EnvVar {
+	env := []corev1.EnvVar{
+		{Name: "HOME", Value: "/home/openclaw"},
+	}
+
+	if instance.Spec.Chromium.Enabled {
+		env = append(env, corev1.EnvVar{
+			Name:  "CHROMIUM_URL",
+			Value: "ws://localhost:9222",
+		})
+	}
+
+	return append(env, instance.Spec.Env...)
 }
 
 // buildChromiumContainer creates the Chromium sidecar container
