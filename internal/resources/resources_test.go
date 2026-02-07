@@ -668,8 +668,24 @@ func TestBuildDeployment_ConfigVolume_RawConfig(t *testing.T) {
 	dep := BuildDeployment(instance)
 	main := dep.Spec.Template.Spec.Containers[0]
 
-	// Should have config volume mount
-	assertVolumeMount(t, main.VolumeMounts, "config", "/home/openclaw/.openclaw/openclaw.json")
+	// Main container should NOT have a config subPath mount (causes EBUSY on rename)
+	for _, vm := range main.VolumeMounts {
+		if vm.Name == "config" {
+			t.Error("main container should not have config volume mount; init container handles config seeding")
+		}
+	}
+
+	// Init container should copy config from ConfigMap to data volume
+	initContainers := dep.Spec.Template.Spec.InitContainers
+	if len(initContainers) != 1 {
+		t.Fatalf("expected 1 init container, got %d", len(initContainers))
+	}
+	initC := initContainers[0]
+	if initC.Name != "init-config" {
+		t.Errorf("init container name = %q, want %q", initC.Name, "init-config")
+	}
+	assertVolumeMount(t, initC.VolumeMounts, "data", "/data")
+	assertVolumeMount(t, initC.VolumeMounts, "config", "/config")
 
 	// Should have config volume pointing to managed configmap
 	volumes := dep.Spec.Template.Spec.Volumes
@@ -693,21 +709,20 @@ func TestBuildDeployment_ConfigVolume_ConfigMapRef(t *testing.T) {
 	}
 
 	dep := BuildDeployment(instance)
-	main := dep.Spec.Template.Spec.Containers[0]
 
-	// Should have config volume mount with custom subpath
-	found := false
-	for _, vm := range main.VolumeMounts {
-		if vm.Name == "config" {
-			found = true
-			if vm.SubPath != "my-config.json" {
-				t.Errorf("config volume mount subPath = %q, want %q", vm.SubPath, "my-config.json")
-			}
-			break
-		}
+	// Init container should copy the custom key from ConfigMap to data volume
+	initContainers := dep.Spec.Template.Spec.InitContainers
+	if len(initContainers) != 1 {
+		t.Fatalf("expected 1 init container, got %d", len(initContainers))
 	}
-	if !found {
-		t.Error("config volume mount not found")
+	initC := initContainers[0]
+	assertVolumeMount(t, initC.VolumeMounts, "data", "/data")
+	assertVolumeMount(t, initC.VolumeMounts, "config", "/config")
+
+	// Verify the command copies the custom key
+	expectedCmd := "cp /config/my-config.json /data/openclaw.json"
+	if len(initC.Command) != 3 || initC.Command[2] != expectedCmd {
+		t.Errorf("init container command = %v, want sh -c %q", initC.Command, expectedCmd)
 	}
 
 	// Volume should reference external configmap
@@ -729,17 +744,27 @@ func TestBuildDeployment_ConfigMapRef_DefaultKey(t *testing.T) {
 	}
 
 	dep := BuildDeployment(instance)
-	main := dep.Spec.Template.Spec.Containers[0]
 
-	for _, vm := range main.VolumeMounts {
-		if vm.Name == "config" {
-			if vm.SubPath != "openclaw.json" {
-				t.Errorf("config volume mount subPath = %q, want %q", vm.SubPath, "openclaw.json")
-			}
-			return
-		}
+	// Init container should use default key "openclaw.json"
+	initContainers := dep.Spec.Template.Spec.InitContainers
+	if len(initContainers) != 1 {
+		t.Fatalf("expected 1 init container, got %d", len(initContainers))
 	}
-	t.Error("config volume mount not found")
+	expectedCmd := "cp /config/openclaw.json /data/openclaw.json"
+	if initContainers[0].Command[2] != expectedCmd {
+		t.Errorf("init container command = %q, want %q", initContainers[0].Command[2], expectedCmd)
+	}
+}
+
+func TestBuildDeployment_NoConfig_NoInitContainer(t *testing.T) {
+	instance := newTestInstance("no-config")
+	// No config set at all
+
+	dep := BuildDeployment(instance)
+
+	if len(dep.Spec.Template.Spec.InitContainers) != 0 {
+		t.Errorf("expected 0 init containers when no config, got %d", len(dep.Spec.Template.Spec.InitContainers))
+	}
 }
 
 func TestBuildDeployment_ServiceAccountName(t *testing.T) {

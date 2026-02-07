@@ -20,6 +20,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -62,6 +63,7 @@ func BuildDeployment(instance *openclawv1alpha1.OpenClawInstance) *appsv1.Deploy
 				Spec: corev1.PodSpec{
 					ServiceAccountName: ServiceAccountName(instance),
 					SecurityContext:    buildPodSecurityContext(instance),
+					InitContainers:     buildInitContainers(instance),
 					Containers:         buildContainers(instance),
 					Volumes:            buildVolumes(instance),
 					NodeSelector:       instance.Spec.Availability.NodeSelector,
@@ -195,25 +197,6 @@ func buildMainContainer(instance *openclawv1alpha1.OpenClawInstance) corev1.Cont
 		},
 	}
 
-	// Add config volume mount if using managed ConfigMap
-	if instance.Spec.Config.ConfigMapRef == nil && instance.Spec.Config.Raw != nil {
-		container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
-			Name:      "config",
-			MountPath: "/home/openclaw/.openclaw/openclaw.json",
-			SubPath:   "openclaw.json",
-		})
-	} else if instance.Spec.Config.ConfigMapRef != nil {
-		key := instance.Spec.Config.ConfigMapRef.Key
-		if key == "" {
-			key = "openclaw.json"
-		}
-		container.VolumeMounts = append(container.VolumeMounts, corev1.VolumeMount{
-			Name:      "config",
-			MountPath: "/home/openclaw/.openclaw/openclaw.json",
-			SubPath:   key,
-		})
-	}
-
 	// Add probes
 	container.LivenessProbe = buildLivenessProbe(instance)
 	container.ReadinessProbe = buildReadinessProbe(instance)
@@ -236,6 +219,50 @@ func buildMainEnv(instance *openclawv1alpha1.OpenClawInstance) []corev1.EnvVar {
 	}
 
 	return append(env, instance.Spec.Env...)
+}
+
+// buildInitContainers creates init containers that seed config into the data volume.
+// Config is copied from the ConfigMap volume so it lives as a regular file on the PVC,
+// allowing the gateway to perform atomic writes (rename) without EBUSY errors.
+func buildInitContainers(instance *openclawv1alpha1.OpenClawInstance) []corev1.Container {
+	key := configMapKey(instance)
+	if key == "" {
+		return nil
+	}
+
+	return []corev1.Container{
+		{
+			Name:    "init-config",
+			Image:   "busybox:1.37",
+			Command: []string{"sh", "-c", fmt.Sprintf("cp /config/%s /data/openclaw.json", key)},
+			SecurityContext: &corev1.SecurityContext{
+				AllowPrivilegeEscalation: Ptr(false),
+				ReadOnlyRootFilesystem:   Ptr(true),
+				RunAsNonRoot:             Ptr(true),
+				Capabilities: &corev1.Capabilities{
+					Drop: []corev1.Capability{"ALL"},
+				},
+			},
+			VolumeMounts: []corev1.VolumeMount{
+				{Name: "data", MountPath: "/data"},
+				{Name: "config", MountPath: "/config"},
+			},
+		},
+	}
+}
+
+// configMapKey returns the ConfigMap key for the config file, or "" if no config is set.
+func configMapKey(instance *openclawv1alpha1.OpenClawInstance) string {
+	if instance.Spec.Config.ConfigMapRef != nil {
+		if instance.Spec.Config.ConfigMapRef.Key != "" {
+			return instance.Spec.Config.ConfigMapRef.Key
+		}
+		return "openclaw.json"
+	}
+	if instance.Spec.Config.Raw != nil {
+		return "openclaw.json"
+	}
+	return ""
 }
 
 // buildChromiumContainer creates the Chromium sidecar container
