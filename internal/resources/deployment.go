@@ -359,7 +359,7 @@ func buildVolumes(instance *openclawv1alpha1.OpenClawInstance) []corev1.Volume {
 				VolumeSource: corev1.VolumeSource{
 					EmptyDir: &corev1.EmptyDirVolumeSource{
 						Medium:    corev1.StorageMediumMemory,
-						SizeLimit: resource.NewQuantity(256*1024*1024, resource.BinarySI), // 256Mi
+						SizeLimit: resource.NewQuantity(1024*1024*1024, resource.BinarySI), // 1Gi
 					},
 				},
 			},
