@@ -500,12 +500,12 @@ func TestBuildDeployment_WithChromium(t *testing.T) {
 	if shmVol.EmptyDir.Medium != corev1.StorageMediumMemory {
 		t.Errorf("chromium-shm medium = %v, want Memory", shmVol.EmptyDir.Medium)
 	}
-	expectedShmSize := resource.NewQuantity(256*1024*1024, resource.BinarySI) // 256Mi
+	expectedShmSize := resource.NewQuantity(1024*1024*1024, resource.BinarySI) // 1Gi
 	if shmVol.EmptyDir.SizeLimit == nil {
 		t.Fatal("chromium-shm sizeLimit is nil")
 	}
 	if shmVol.EmptyDir.SizeLimit.Cmp(*expectedShmSize) != 0 {
-		t.Errorf("chromium-shm sizeLimit = %v, want 256Mi", shmVol.EmptyDir.SizeLimit.String())
+		t.Errorf("chromium-shm sizeLimit = %v, want 1Gi", shmVol.EmptyDir.SizeLimit.String())
 	}
 }
 
