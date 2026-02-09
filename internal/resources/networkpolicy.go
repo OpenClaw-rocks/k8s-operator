@@ -178,5 +178,8 @@ func buildEgressRules(instance *openclawv1alpha1.OpenClawInstance) []networkingv
 		})
 	}
 
+	// Append user-defined additional egress rules
+	rules = append(rules, instance.Spec.Security.NetworkPolicy.AdditionalEgress...)
+
 	return rules
 }

@@ -2,6 +2,7 @@ package v1alpha1
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
@@ -220,6 +221,11 @@ type NetworkPolicySpec struct {
 	// +kubebuilder:default=true
 	// +optional
 	AllowDNS *bool `json:"allowDNS,omitempty"`
+
+	// AdditionalEgress appends custom egress rules to the default DNS + HTTPS rules.
+	// Use this to allow traffic to cluster-internal services on non-standard ports.
+	// +optional
+	AdditionalEgress []networkingv1.NetworkPolicyEgressRule `json:"additionalEgress,omitempty"`
 }
 
 // RBACSpec configures RBAC for the OpenClaw instance

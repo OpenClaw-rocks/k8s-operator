@@ -1163,6 +1163,85 @@ func TestBuildNetworkPolicy_AllowedNamespaces(t *testing.T) {
 	}
 }
 
+func TestBuildNetworkPolicy_AdditionalEgress(t *testing.T) {
+	instance := newTestInstance("np-extra-egress")
+	instance.Spec.Security.NetworkPolicy.AdditionalEgress = []networkingv1.NetworkPolicyEgressRule{
+		{
+			To: []networkingv1.NetworkPolicyPeer{
+				{
+					NamespaceSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"kubernetes.io/metadata.name": "bifrost",
+						},
+					},
+				},
+			},
+			Ports: []networkingv1.NetworkPolicyPort{
+				{
+					Protocol: Ptr(corev1.ProtocolTCP),
+					Port:     Ptr(intstr.FromInt(8080)),
+				},
+			},
+		},
+		{
+			To: []networkingv1.NetworkPolicyPeer{
+				{
+					IPBlock: &networkingv1.IPBlock{
+						CIDR: "10.96.0.0/16",
+					},
+				},
+			},
+			Ports: []networkingv1.NetworkPolicyPort{
+				{
+					Protocol: Ptr(corev1.ProtocolTCP),
+					Port:     Ptr(intstr.FromInt(9090)),
+				},
+			},
+		},
+	}
+
+	np := BuildNetworkPolicy(instance)
+
+	// Default rules: DNS (index 0) + HTTPS (index 1) = 2, plus 2 additional = 4
+	if len(np.Spec.Egress) != 4 {
+		t.Fatalf("expected 4 egress rules (DNS + HTTPS + 2 additional), got %d", len(np.Spec.Egress))
+	}
+
+	// First two rules should be the defaults (DNS + HTTPS)
+	dnsRule := np.Spec.Egress[0]
+	if len(dnsRule.Ports) != 2 || dnsRule.Ports[0].Port.IntValue() != 53 {
+		t.Error("first egress rule should be DNS (port 53)")
+	}
+	httpsRule := np.Spec.Egress[1]
+	if len(httpsRule.Ports) != 1 || httpsRule.Ports[0].Port.IntValue() != 443 {
+		t.Error("second egress rule should be HTTPS (port 443)")
+	}
+
+	// Third rule: bifrost namespace on port 8080
+	bifrostRule := np.Spec.Egress[2]
+	if len(bifrostRule.To) != 1 || bifrostRule.To[0].NamespaceSelector == nil {
+		t.Fatal("third egress rule should have a namespace selector")
+	}
+	if bifrostRule.To[0].NamespaceSelector.MatchLabels["kubernetes.io/metadata.name"] != "bifrost" {
+		t.Error("third egress rule should target bifrost namespace")
+	}
+	if len(bifrostRule.Ports) != 1 || bifrostRule.Ports[0].Port.IntValue() != 8080 {
+		t.Error("third egress rule should allow port 8080")
+	}
+
+	// Fourth rule: CIDR 10.96.0.0/16 on port 9090
+	cidrRule := np.Spec.Egress[3]
+	if len(cidrRule.To) != 1 || cidrRule.To[0].IPBlock == nil {
+		t.Fatal("fourth egress rule should have an IPBlock")
+	}
+	if cidrRule.To[0].IPBlock.CIDR != "10.96.0.0/16" {
+		t.Errorf("fourth egress CIDR = %q, want %q", cidrRule.To[0].IPBlock.CIDR, "10.96.0.0/16")
+	}
+	if len(cidrRule.Ports) != 1 || cidrRule.Ports[0].Port.IntValue() != 9090 {
+		t.Error("fourth egress rule should allow port 9090")
+	}
+}
+
 // ---------------------------------------------------------------------------
 // rbac.go tests
 // ---------------------------------------------------------------------------
