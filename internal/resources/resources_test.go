@@ -17,6 +17,7 @@ limitations under the License.
 package resources
 
 import (
+	"bytes"
 	"encoding/json"
 	"testing"
 
@@ -460,11 +461,11 @@ func TestBuildDeployment_WithChromium(t *testing.T) {
 	if csc == nil {
 		t.Fatal("chromium security context is nil")
 	}
-	if csc.ReadOnlyRootFilesystem == nil || !*csc.ReadOnlyRootFilesystem {
-		t.Error("chromium: readOnlyRootFilesystem should be true")
+	if csc.ReadOnlyRootFilesystem == nil || *csc.ReadOnlyRootFilesystem {
+		t.Error("chromium: readOnlyRootFilesystem should be false (Chromium needs writable dirs)")
 	}
-	if csc.RunAsUser == nil || *csc.RunAsUser != 1001 {
-		t.Errorf("chromium: runAsUser = %v, want 1001", csc.RunAsUser)
+	if csc.RunAsUser == nil || *csc.RunAsUser != 999 {
+		t.Errorf("chromium: runAsUser = %v, want 999 (browserless blessuser)", csc.RunAsUser)
 	}
 
 	// Chromium resource defaults
@@ -1474,7 +1475,7 @@ func TestEnrichConfigWithModules_PreservesAlreadyEnabledModule(t *testing.T) {
 	}
 
 	// Should return unchanged (no modification needed)
-	if string(out) != string(input) {
+	if !bytes.Equal(out, input) {
 		t.Errorf("config should not be modified when module already enabled")
 	}
 }
@@ -1486,7 +1487,7 @@ func TestEnrichConfigWithModules_NoChannels(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if string(out) != string(input) {
+	if !bytes.Equal(out, input) {
 		t.Errorf("config without channels should not be modified")
 	}
 }
@@ -1549,7 +1550,7 @@ func TestEnrichConfigWithModules_InvalidJSON(t *testing.T) {
 		t.Fatal("should not error on invalid JSON")
 	}
 
-	if string(out) != string(input) {
+	if !bytes.Equal(out, input) {
 		t.Errorf("invalid JSON should be returned unchanged")
 	}
 }

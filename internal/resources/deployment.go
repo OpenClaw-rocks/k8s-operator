@@ -186,7 +186,7 @@ func buildMainContainer(instance *openclawv1alpha1.OpenClawInstance) corev1.Cont
 				Protocol:      corev1.ProtocolTCP,
 			},
 		},
-		Env: buildMainEnv(instance),
+		Env:       buildMainEnv(instance),
 		EnvFrom:   instance.Spec.EnvFrom,
 		Resources: buildResourceRequirements(instance),
 		VolumeMounts: []corev1.VolumeMount{
@@ -288,9 +288,9 @@ func buildChromiumContainer(instance *openclawv1alpha1.OpenClawInstance) corev1.
 		ImagePullPolicy: corev1.PullIfNotPresent,
 		SecurityContext: &corev1.SecurityContext{
 			AllowPrivilegeEscalation: Ptr(false),
-			ReadOnlyRootFilesystem:   Ptr(true),
+			ReadOnlyRootFilesystem:   Ptr(false), // Chromium needs writable dirs for profiles, cache, crash dumps
 			RunAsNonRoot:             Ptr(true),
-			RunAsUser:                Ptr(int64(1001)),
+			RunAsUser:                Ptr(int64(999)), // browserless built-in user (blessuser)
 			Capabilities: &corev1.Capabilities{
 				Drop: []corev1.Capability{"ALL"},
 			},
