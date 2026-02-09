@@ -17,6 +17,7 @@ limitations under the License.
 package resources
 
 import (
+	"encoding/json"
 	"testing"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -1392,6 +1393,191 @@ func TestBuildConfigMap_InvalidJSON_RawPreserved(t *testing.T) {
 	expected := "{\n  \"key\": \"value\"\n}"
 	if content != expected {
 		t.Errorf("config content = %q, want %q", content, expected)
+	}
+}
+
+func TestEnrichConfigWithModules_AddsModulesForEnabledChannels(t *testing.T) {
+	input := []byte(`{"channels":{"telegram":{"enabled":true,"botToken":"tok"}}}`)
+	out, err := enrichConfigWithModules(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var cfg map[string]interface{}
+	if err := json.Unmarshal(out, &cfg); err != nil {
+		t.Fatal(err)
+	}
+
+	modules, ok := cfg["modules"].([]interface{})
+	if !ok || len(modules) != 1 {
+		t.Fatalf("expected 1 module entry, got %v", cfg["modules"])
+	}
+	mod := modules[0].(map[string]interface{})
+	if mod["location"] != "MODULES_ROOT/channel-telegram" {
+		t.Errorf("module location = %q, want %q", mod["location"], "MODULES_ROOT/channel-telegram")
+	}
+	if mod["enabled"] != true {
+		t.Errorf("module enabled = %v, want true", mod["enabled"])
+	}
+}
+
+func TestEnrichConfigWithModules_SkipsDisabledChannels(t *testing.T) {
+	input := []byte(`{"channels":{"telegram":{"enabled":false,"botToken":"tok"}}}`)
+	out, err := enrichConfigWithModules(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var cfg map[string]interface{}
+	if err := json.Unmarshal(out, &cfg); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, ok := cfg["modules"]; ok {
+		t.Error("modules should not be added for disabled channels")
+	}
+}
+
+func TestEnrichConfigWithModules_EnablesExistingDisabledModule(t *testing.T) {
+	input := []byte(`{
+		"channels":{"telegram":{"enabled":true}},
+		"modules":[{"location":"MODULES_ROOT/channel-telegram","enabled":false}]
+	}`)
+	out, err := enrichConfigWithModules(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var cfg map[string]interface{}
+	if err := json.Unmarshal(out, &cfg); err != nil {
+		t.Fatal(err)
+	}
+
+	modules := cfg["modules"].([]interface{})
+	if len(modules) != 1 {
+		t.Fatalf("expected 1 module, got %d", len(modules))
+	}
+	mod := modules[0].(map[string]interface{})
+	if mod["enabled"] != true {
+		t.Errorf("existing disabled module should be enabled, got %v", mod["enabled"])
+	}
+}
+
+func TestEnrichConfigWithModules_PreservesAlreadyEnabledModule(t *testing.T) {
+	input := []byte(`{
+		"channels":{"telegram":{"enabled":true}},
+		"modules":[{"location":"MODULES_ROOT/channel-telegram","enabled":true}]
+	}`)
+	out, err := enrichConfigWithModules(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Should return unchanged (no modification needed)
+	if string(out) != string(input) {
+		t.Errorf("config should not be modified when module already enabled")
+	}
+}
+
+func TestEnrichConfigWithModules_NoChannels(t *testing.T) {
+	input := []byte(`{"mcpServers":{"test":{"url":"http://localhost"}}}`)
+	out, err := enrichConfigWithModules(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if string(out) != string(input) {
+		t.Errorf("config without channels should not be modified")
+	}
+}
+
+func TestEnrichConfigWithModules_MultipleChannels(t *testing.T) {
+	input := []byte(`{"channels":{"telegram":{"enabled":true},"slack":{"enabled":true},"discord":{"enabled":false}}}`)
+	out, err := enrichConfigWithModules(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var cfg map[string]interface{}
+	if err := json.Unmarshal(out, &cfg); err != nil {
+		t.Fatal(err)
+	}
+
+	modules := cfg["modules"].([]interface{})
+	if len(modules) != 2 {
+		t.Fatalf("expected 2 modules (telegram+slack, not discord), got %d", len(modules))
+	}
+
+	locations := map[string]bool{}
+	for _, mod := range modules {
+		m := mod.(map[string]interface{})
+		locations[m["location"].(string)] = true
+	}
+	if !locations["MODULES_ROOT/channel-telegram"] {
+		t.Error("missing telegram module")
+	}
+	if !locations["MODULES_ROOT/channel-slack"] {
+		t.Error("missing slack module")
+	}
+}
+
+func TestEnrichConfigWithModules_PreservesExistingModules(t *testing.T) {
+	input := []byte(`{
+		"channels":{"telegram":{"enabled":true}},
+		"modules":[{"location":"MODULES_ROOT/nlu","enabled":true}]
+	}`)
+	out, err := enrichConfigWithModules(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var cfg map[string]interface{}
+	if err := json.Unmarshal(out, &cfg); err != nil {
+		t.Fatal(err)
+	}
+
+	modules := cfg["modules"].([]interface{})
+	if len(modules) != 2 {
+		t.Fatalf("expected 2 modules (existing nlu + new telegram), got %d", len(modules))
+	}
+}
+
+func TestEnrichConfigWithModules_InvalidJSON(t *testing.T) {
+	input := []byte(`not valid json`)
+	out, err := enrichConfigWithModules(input)
+	if err != nil {
+		t.Fatal("should not error on invalid JSON")
+	}
+
+	if string(out) != string(input) {
+		t.Errorf("invalid JSON should be returned unchanged")
+	}
+}
+
+func TestBuildConfigMap_EnrichesChannelModules(t *testing.T) {
+	instance := newTestInstance("cm-enrich")
+	instance.Spec.Config.Raw = &openclawv1alpha1.RawConfig{
+		RawExtension: runtime.RawExtension{
+			Raw: []byte(`{"channels":{"telegram":{"enabled":true,"botToken":"tok"}}}`),
+		},
+	}
+
+	cm := BuildConfigMap(instance)
+	content := cm.Data["openclaw.json"]
+
+	// The enriched config should contain the module entry
+	var cfg map[string]interface{}
+	if err := json.Unmarshal([]byte(content), &cfg); err != nil {
+		t.Fatalf("config content is not valid JSON: %v", err)
+	}
+
+	modules, ok := cfg["modules"].([]interface{})
+	if !ok || len(modules) != 1 {
+		t.Fatalf("expected 1 module entry in enriched config, got %v", cfg["modules"])
+	}
+	mod := modules[0].(map[string]interface{})
+	if mod["location"] != "MODULES_ROOT/channel-telegram" {
+		t.Errorf("module location = %q, want %q", mod["location"], "MODULES_ROOT/channel-telegram")
 	}
 }
 

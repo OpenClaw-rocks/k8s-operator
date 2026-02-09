@@ -32,7 +32,13 @@ func BuildConfigMap(instance *openclawv1alpha1.OpenClawInstance) *corev1.ConfigM
 	// Generate openclaw.json content from raw config
 	configContent := "{}"
 	if instance.Spec.Config.Raw != nil && len(instance.Spec.Config.Raw.Raw) > 0 {
-		configContent = string(instance.Spec.Config.Raw.Raw)
+		configBytes := instance.Spec.Config.Raw.Raw
+		// Pre-enable modules for configured channels so the gateway does not
+		// need to modify the config file on startup (avoids EBUSY on rename).
+		if enriched, err := enrichConfigWithModules(configBytes); err == nil {
+			configBytes = enriched
+		}
+		configContent = string(configBytes)
 	}
 
 	// Try to pretty-print the JSON
@@ -53,4 +59,72 @@ func BuildConfigMap(instance *openclawv1alpha1.OpenClawInstance) *corev1.ConfigM
 			"openclaw.json": configContent,
 		},
 	}
+}
+
+// enrichConfigWithModules detects configured channels and ensures their
+// corresponding module entries are present in the modules array. This prevents
+// the gateway from needing to auto-enable modules on startup, which causes
+// EBUSY errors on atomic rename with certain storage backends (e.g. Longhorn).
+func enrichConfigWithModules(configJSON []byte) ([]byte, error) {
+	var config map[string]interface{}
+	if err := json.Unmarshal(configJSON, &config); err != nil {
+		return configJSON, nil // not a JSON object, return unchanged
+	}
+
+	channels, ok := config["channels"].(map[string]interface{})
+	if !ok || len(channels) == 0 {
+		return configJSON, nil
+	}
+
+	// Get or create modules array
+	var modules []interface{}
+	if existing, ok := config["modules"].([]interface{}); ok {
+		modules = existing
+	}
+
+	// Index existing module locations
+	locationIndex := make(map[string]int) // location -> index in modules
+	for i, mod := range modules {
+		if m, ok := mod.(map[string]interface{}); ok {
+			if loc, ok := m["location"].(string); ok {
+				locationIndex[loc] = i
+			}
+		}
+	}
+
+	changed := false
+	for name, channelCfg := range channels {
+		cm, ok := channelCfg.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		enabled, _ := cm["enabled"].(bool)
+		if !enabled {
+			continue
+		}
+
+		location := "MODULES_ROOT/channel-" + name
+		if idx, exists := locationIndex[location]; exists {
+			// Ensure the existing entry is enabled
+			if m, ok := modules[idx].(map[string]interface{}); ok {
+				if e, _ := m["enabled"].(bool); !e {
+					m["enabled"] = true
+					changed = true
+				}
+			}
+		} else {
+			modules = append(modules, map[string]interface{}{
+				"location": location,
+				"enabled":  true,
+			})
+			changed = true
+		}
+	}
+
+	if !changed {
+		return configJSON, nil
+	}
+
+	config["modules"] = modules
+	return json.Marshal(config)
 }
