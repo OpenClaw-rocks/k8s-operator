@@ -146,7 +146,7 @@ EOF
 
 ```bash
 helm install openclaw-operator \
-  oci://ghcr.io/openclawrocks/charts/openclaw-operator \
+  oci://ghcr.io/openclaw-rocks/charts/openclaw-operator \
   --namespace openclaw-system --create-namespace \
   --set leaderElection.enabled=true
 ```
@@ -263,7 +263,7 @@ EOF
 
 ```bash
 helm install openclaw-operator \
-  oci://ghcr.io/openclawrocks/charts/openclaw-operator \
+  oci://ghcr.io/openclaw-rocks/charts/openclaw-operator \
   --namespace openclaw-system --create-namespace \
   --set leaderElection.enabled=true
 ```
@@ -383,7 +383,7 @@ EOF
 
 ```bash
 helm install openclaw-operator \
-  oci://ghcr.io/openclawrocks/charts/openclaw-operator \
+  oci://ghcr.io/openclaw-rocks/charts/openclaw-operator \
   --namespace openclaw-system --create-namespace \
   --set leaderElection.enabled=true
 ```
@@ -458,7 +458,7 @@ kubectl get storageclass
 ```bash
 # Add the OCI registry (no separate repo add needed for OCI)
 helm install openclaw-operator \
-  oci://ghcr.io/openclawrocks/charts/openclaw-operator \
+  oci://ghcr.io/openclaw-rocks/charts/openclaw-operator \
   --namespace openclaw-system --create-namespace \
   --set leaderElection.enabled=true
 ```
@@ -467,14 +467,14 @@ helm install openclaw-operator \
 
 ```bash
 # Clone the repository
-git clone https://github.com/openclawrocks/k8s-operator.git
+git clone https://github.com/OpenClaw-rocks/k8s-operator.git
 cd k8s-operator
 
 # Install CRDs
 make install
 
 # Deploy the operator
-make deploy IMG=ghcr.io/openclawrocks/openclaw-operator:v0.1.0
+make deploy IMG=ghcr.io/openclaw-rocks/openclaw-operator:v0.1.0
 ```
 
 ### 4. Create an Instance

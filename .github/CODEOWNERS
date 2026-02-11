@@ -1,9 +1,9 @@
 # Default owners for everything in the repo
-* @openclawrocks/maintainers
+* @OpenClaw-rocks/maintainers
 
 # API changes require additional review
-/api/ @openclawrocks/maintainers
+/api/ @OpenClaw-rocks/maintainers
 
 # Security-related changes
-/internal/webhook/ @openclawrocks/maintainers
-/internal/security/ @openclawrocks/maintainers
+/internal/webhook/ @OpenClaw-rocks/maintainers
+/internal/security/ @OpenClaw-rocks/maintainers
