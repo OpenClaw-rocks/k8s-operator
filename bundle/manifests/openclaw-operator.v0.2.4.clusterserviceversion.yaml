@@ -110,7 +110,7 @@ spec:
     ## OpenClaw Kubernetes Operator
 
     A production-grade Kubernetes operator for deploying and managing
-    [OpenClaw](https://openclaw.rocks) AI agent instances.
+    [OpenClaw](https://openclaw.ai) AI agent instances.
 
     ### Features
 
