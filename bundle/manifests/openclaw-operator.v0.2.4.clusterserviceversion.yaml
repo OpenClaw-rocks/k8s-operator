@@ -1,0 +1,459 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  name: openclaw-operator.v0.2.4
+  namespace: placeholder
+  annotations:
+    capabilities: "Basic Install"
+    categories: "AI/Machine Learning"
+    containerImage: ghcr.io/openclaw-rocks/openclaw-operator:v0.2.4
+    createdAt: "2026-02-11T00:00:00Z"
+    support: OpenClaw.rocks
+    repository: https://github.com/OpenClaw-rocks/k8s-operator
+    description: "A production-grade Kubernetes operator for deploying and managing OpenClaw AI agent instances."
+    alm-examples: |-
+      [
+        {
+          "apiVersion": "openclaw.openclaw.io/v1alpha1",
+          "kind": "OpenClawInstance",
+          "metadata": {
+            "name": "my-openclaw",
+            "namespace": "default"
+          },
+          "spec": {
+            "envFrom": [
+              {
+                "secretRef": {
+                  "name": "openclaw-api-keys"
+                }
+              }
+            ],
+            "storage": {
+              "persistence": {
+                "enabled": true,
+                "size": "10Gi"
+              }
+            }
+          }
+        },
+        {
+          "apiVersion": "openclaw.openclaw.io/v1alpha1",
+          "kind": "OpenClawInstance",
+          "metadata": {
+            "name": "production-openclaw",
+            "namespace": "openclaw"
+          },
+          "spec": {
+            "image": {
+              "repository": "ghcr.io/openclaw/openclaw",
+              "tag": "2026.2.3"
+            },
+            "config": {
+              "raw": {
+                "agents": {
+                  "defaults": {
+                    "model": {
+                      "primary": "anthropic/claude-sonnet-4-20250514"
+                    },
+                    "sandbox": true
+                  }
+                }
+              }
+            },
+            "envFrom": [
+              {
+                "secretRef": {
+                  "name": "openclaw-api-keys"
+                }
+              }
+            ],
+            "resources": {
+              "requests": {
+                "cpu": "500m",
+                "memory": "1Gi"
+              },
+              "limits": {
+                "cpu": "2000m",
+                "memory": "4Gi"
+              }
+            },
+            "chromium": {
+              "enabled": true,
+              "resources": {
+                "requests": {
+                  "cpu": "250m",
+                  "memory": "512Mi"
+                },
+                "limits": {
+                  "cpu": "1000m",
+                  "memory": "2Gi"
+                }
+              }
+            },
+            "storage": {
+              "persistence": {
+                "enabled": true,
+                "size": "50Gi"
+              }
+            },
+            "security": {
+              "networkPolicy": {
+                "enabled": true
+              }
+            }
+          }
+        }
+      ]
+spec:
+  displayName: OpenClaw Operator
+  description: |
+    ## OpenClaw Kubernetes Operator
+
+    A production-grade Kubernetes operator for deploying and managing
+    [OpenClaw](https://openclaw.rocks) AI agent instances.
+
+    ### Features
+
+    - **Declarative Deployment**: Deploy OpenClaw instances using Kubernetes Custom Resources
+    - **Security-First**: Built-in NetworkPolicies, RBAC, Pod Security Standards, and a validating webhook
+    - **Provider-Agnostic**: Support any AI provider via environment variables
+    - **High Availability**: PodDisruptionBudgets, health probes, and graceful upgrades
+    - **Observability**: Prometheus ServiceMonitor, structured logging, and Kubernetes events
+    - **Browser Automation**: Optional Chromium sidecar for web automation capabilities
+
+    ### Default Security Posture
+
+    All containers run as non-root (UID 1000) with all Linux capabilities dropped,
+    RuntimeDefault seccomp profiles, default-deny NetworkPolicies, and minimal RBAC
+    permissions per instance.
+
+    ### Prerequisites
+
+    - Kubernetes 1.28+
+
+    ### Getting Started
+
+    1. Create a Secret with your AI provider API keys
+    2. Create an OpenClawInstance custom resource
+    3. The operator handles the rest: Deployment, Service, ServiceAccount, RBAC,
+       NetworkPolicy, PodDisruptionBudget, ConfigMap, PVC, and optional Ingress
+
+    For full documentation, visit [openclaw.rocks/blog/openclaw-kubernetes-operator](https://openclaw.rocks/blog/openclaw-kubernetes-operator).
+  maturity: alpha
+  version: 0.2.4
+  minKubeVersion: 1.28.0
+  keywords:
+    - ai
+    - agent
+    - openclaw
+    - automation
+    - llm
+    - kubernetes
+  maintainers:
+    - name: Jannes Stubbemann
+      email: jannes@openclaw.rocks
+  provider:
+    name: OpenClaw.rocks
+    url: https://openclaw.rocks
+  links:
+    - name: Website
+      url: https://openclaw.rocks
+    - name: Documentation
+      url: https://github.com/OpenClaw-rocks/k8s-operator
+    - name: Blog Post
+      url: https://openclaw.rocks/blog/openclaw-kubernetes-operator
+  icon:
+    - base64data: PHN2ZyB2aWV3Qm94PSIwIDAgMTIwIDEyMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KICA8cGF0aCBkPSJNNjAgMTAgQzMwIDEwIDE1IDM1IDE1IDU1IEMxNSA3NSAzMCA5NSA0NSAxMDAgTDQ1IDExMCBMNTUgMTEwIEw1NSAxMDAgQzU1IDEwMCA2MCAxMDIgNjUgMTAwIEw2NSAxMTAgTDc1IDExMCBMNzUgMTAwIEM5MCA5NSAxMDUgNzUgMTA1IDU1IEMxMDUgMzUgOTAgMTAgNjAgMTBaIiBmaWxsPSJ1cmwoI2xvYnN0ZXItZ3JhZGllbnQpIi8+CiAgPHBhdGggZD0iTTIwIDQ1IEM1IDQwIDAgNTAgNSA2MCBDMTAgNzAgMjAgNjUgMjUgNTUgQzI4IDQ4IDI1IDQ1IDIwIDQ1WiIgZmlsbD0idXJsKCNsb2JzdGVyLWdyYWRpZW50KSIvPgogIDxwYXRoIGQ9Ik0xMDAgNDUgQzExNSA0MCAxMjAgNTAgMTE1IDYwIEMxMTAgNzAgMTAwIDY1IDk1IDU1IEM5MiA0OCA5NSA0NSAxMDAgNDVaIiBmaWxsPSJ1cmwoI2xvYnN0ZXItZ3JhZGllbnQpIi8+CiAgPHBhdGggZD0iTTQ1IDE1IFEzNSA1IDMwIDgiIHN0cm9rZT0iI2Y4NzE3MSIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICA8cGF0aCBkPSJNNzUgMTUgUTg1IDUgOTAgOCIgc3Ryb2tlPSIjZjg3MTcxIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogIDxwYXRoIGQ9Ik0zMCAzMiBMNTIgMzIgTDUyIDQyIFE1MiA0NiA0OCA0NiBMMzQgNDYgUTMwIDQ2IDMwIDQyIFoiIGZpbGw9IiMwYTBhMGIiLz4KICA8cGF0aCBkPSJNNjggMzIgTDkwIDMyIEw5MCA0MiBROTAgNDYgODYgNDYgTDcyIDQ2IFE2OCA0NiA2OCA0MiBaIiBmaWxsPSIjMGEwYTBiIi8+CiAgPHBhdGggZD0iTTUyIDM2IEw2OCAzNiIgc3Ryb2tlPSIjMGEwYTBiIiBzdHJva2Utd2lkdGg9IjMiLz4KICA8cmVjdCB4PSIzMiIgeT0iMzQiIHdpZHRoPSI2IiBoZWlnaHQ9IjIiIGZpbGw9IiNmYWZhZmEiIG9wYWNpdHk9IjAuMyIgcng9IjEiLz4KICA8cmVjdCB4PSI3MCIgeT0iMzQiIHdpZHRoPSI2IiBoZWlnaHQ9IjIiIGZpbGw9IiNmYWZhZmEiIG9wYWNpdHk9IjAuMyIgcng9IjEiLz4KICA8ZGVmcz4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0ibG9ic3Rlci1ncmFkaWVudCIgeDE9IjAlIiB5MT0iMCUiIHgyPSIxMDAlIiB5Mj0iMTAwJSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiNmODcxNzEiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjZGMyNjI2Ii8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogIDwvZGVmcz4KPC9zdmc+Cg==
+      mediatype: image/svg+xml
+  installModes:
+    - type: OwnNamespace
+      supported: true
+    - type: SingleNamespace
+      supported: true
+    - type: MultiNamespace
+      supported: false
+    - type: AllNamespaces
+      supported: true
+  customresourcedefinitions:
+    owned:
+      - name: openclawinstances.openclaw.openclaw.io
+        version: v1alpha1
+        kind: OpenClawInstance
+        displayName: OpenClaw Instance
+        description: Represents a managed OpenClaw AI agent instance with security, networking, storage, and observability configuration.
+        specDescriptors:
+          - path: image.repository
+            displayName: Image Repository
+            description: Container image repository for OpenClaw
+            x-descriptors:
+              - "urn:alm:descriptor:com.tectonic.ui:text"
+          - path: image.tag
+            displayName: Image Tag
+            description: Container image tag
+            x-descriptors:
+              - "urn:alm:descriptor:com.tectonic.ui:text"
+          - path: chromium.enabled
+            displayName: Chromium Sidecar
+            description: Enable Chromium browser automation sidecar
+            x-descriptors:
+              - "urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+          - path: security.networkPolicy.enabled
+            displayName: Network Policy
+            description: Enable default-deny NetworkPolicy
+            x-descriptors:
+              - "urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+          - path: storage.persistence.enabled
+            displayName: Persistent Storage
+            description: Enable persistent volume for agent data
+            x-descriptors:
+              - "urn:alm:descriptor:com.tectonic.ui:booleanSwitch"
+          - path: storage.persistence.size
+            displayName: Storage Size
+            description: Size of the persistent volume
+            x-descriptors:
+              - "urn:alm:descriptor:com.tectonic.ui:text"
+          - path: resources
+            displayName: Resource Requirements
+            description: CPU and memory requests/limits
+            x-descriptors:
+              - "urn:alm:descriptor:com.tectonic.ui:resourceRequirements"
+        statusDescriptors:
+          - path: phase
+            displayName: Phase
+            description: Current phase of the OpenClaw instance
+            x-descriptors:
+              - "urn:alm:descriptor:io.kubernetes.phase"
+          - path: gatewayEndpoint
+            displayName: Gateway Endpoint
+            description: Internal service endpoint for the OpenClaw gateway
+            x-descriptors:
+              - "urn:alm:descriptor:text"
+          - path: canvasEndpoint
+            displayName: Canvas Endpoint
+            description: Internal service endpoint for the OpenClaw canvas UI
+            x-descriptors:
+              - "urn:alm:descriptor:text"
+        resources:
+          - kind: Deployment
+            version: v1
+          - kind: Service
+            version: v1
+          - kind: ServiceAccount
+            version: v1
+          - kind: ConfigMap
+            version: v1
+          - kind: PersistentVolumeClaim
+            version: v1
+          - kind: NetworkPolicy
+            version: v1
+          - kind: PodDisruptionBudget
+            version: v1
+          - kind: Ingress
+            version: v1
+          - kind: Role
+            version: v1
+          - kind: RoleBinding
+            version: v1
+  install:
+    strategy: deployment
+    spec:
+      clusterPermissions:
+        - serviceAccountName: openclaw-operator-controller-manager
+          rules:
+            - apiGroups:
+                - ""
+              resources:
+                - configmaps
+                - persistentvolumeclaims
+                - serviceaccounts
+                - services
+              verbs:
+                - create
+                - delete
+                - get
+                - list
+                - patch
+                - update
+                - watch
+            - apiGroups:
+                - ""
+              resources:
+                - events
+              verbs:
+                - create
+                - patch
+            - apiGroups:
+                - ""
+              resources:
+                - secrets
+              verbs:
+                - get
+                - list
+                - watch
+            - apiGroups:
+                - apps
+              resources:
+                - deployments
+              verbs:
+                - create
+                - delete
+                - get
+                - list
+                - patch
+                - update
+                - watch
+            - apiGroups:
+                - monitoring.coreos.com
+              resources:
+                - servicemonitors
+              verbs:
+                - create
+                - delete
+                - get
+                - list
+                - patch
+                - update
+                - watch
+            - apiGroups:
+                - networking.k8s.io
+              resources:
+                - ingresses
+                - networkpolicies
+              verbs:
+                - create
+                - delete
+                - get
+                - list
+                - patch
+                - update
+                - watch
+            - apiGroups:
+                - openclaw.openclaw.io
+              resources:
+                - openclawinstances
+              verbs:
+                - create
+                - delete
+                - get
+                - list
+                - patch
+                - update
+                - watch
+            - apiGroups:
+                - openclaw.openclaw.io
+              resources:
+                - openclawinstances/finalizers
+              verbs:
+                - update
+            - apiGroups:
+                - openclaw.openclaw.io
+              resources:
+                - openclawinstances/status
+              verbs:
+                - get
+                - patch
+                - update
+            - apiGroups:
+                - policy
+              resources:
+                - poddisruptionbudgets
+              verbs:
+                - create
+                - delete
+                - get
+                - list
+                - patch
+                - update
+                - watch
+            - apiGroups:
+                - rbac.authorization.k8s.io
+              resources:
+                - rolebindings
+                - roles
+              verbs:
+                - create
+                - delete
+                - get
+                - list
+                - patch
+                - update
+                - watch
+            # Leader election
+            - apiGroups:
+                - ""
+              resources:
+                - configmaps
+              verbs:
+                - get
+                - list
+                - watch
+                - create
+                - update
+                - patch
+                - delete
+            - apiGroups:
+                - coordination.k8s.io
+              resources:
+                - leases
+              verbs:
+                - get
+                - list
+                - watch
+                - create
+                - update
+                - patch
+                - delete
+      deployments:
+        - name: openclaw-operator-controller-manager
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                control-plane: controller-manager
+            template:
+              metadata:
+                annotations:
+                  kubectl.kubernetes.io/default-container: manager
+                labels:
+                  control-plane: controller-manager
+              spec:
+                securityContext:
+                  runAsNonRoot: true
+                  seccompProfile:
+                    type: RuntimeDefault
+                serviceAccountName: openclaw-operator-controller-manager
+                terminationGracePeriodSeconds: 10
+                containers:
+                  - name: manager
+                    image: ghcr.io/openclaw-rocks/openclaw-operator:v0.2.4
+                    command:
+                      - /manager
+                    args:
+                      - --leader-elect
+                      - --health-probe-bind-address=:8081
+                    securityContext:
+                      allowPrivilegeEscalation: false
+                      capabilities:
+                        drop:
+                          - ALL
+                      readOnlyRootFilesystem: true
+                      runAsNonRoot: true
+                    livenessProbe:
+                      httpGet:
+                        path: /healthz
+                        port: 8081
+                      initialDelaySeconds: 15
+                      periodSeconds: 20
+                    readinessProbe:
+                      httpGet:
+                        path: /readyz
+                        port: 8081
+                      initialDelaySeconds: 5
+                      periodSeconds: 10
+                    resources:
+                      limits:
+                        cpu: 500m
+                        memory: 256Mi
+                      requests:
+                        cpu: 100m
+                        memory: 128Mi
