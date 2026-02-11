@@ -10,10 +10,55 @@ keywords:
   - openclaw
   - ai
   - assistant
-home: https://github.com/OpenClaw-rocks/k8s-operator
+  - llm
+  - automation
+  - agent
+home: https://openclaw.rocks
+icon: https://openclaw.rocks/favicon.svg
 sources:
   - https://github.com/OpenClaw-rocks/k8s-operator
 maintainers:
-  - name: OpenClaw Community
-    url: https://github.com/OpenClaw-rocks
+  - name: Jannes Stubbemann
+    email: jannes@openclaw.rocks
+    url: https://github.com/stubbi
 kubeVersion: ">=1.28.0-0"
+annotations:
+  artifacthub.io/category: ai-machine-learning
+  artifacthub.io/license: Apache-2.0
+  artifacthub.io/operator: "true"
+  artifacthub.io/operatorCapabilities: Basic Install
+  artifacthub.io/prerelease: "false"
+  artifacthub.io/links: |
+    - name: Website
+      url: https://openclaw.rocks
+    - name: Blog Post
+      url: https://openclaw.rocks/blog/openclaw-kubernetes-operator
+    - name: OperatorHub
+      url: https://operatorhub.io/operator/openclaw-operator
+    - name: support
+      url: https://github.com/OpenClaw-rocks/k8s-operator/issues
+  artifacthub.io/crds: |
+    - kind: OpenClawInstance
+      version: v1alpha1
+      name: openclawinstances.openclaw.openclaw.io
+      displayName: OpenClaw Instance
+      description: Represents a managed OpenClaw AI agent instance
+  artifacthub.io/crdsExamples: |
+    - apiVersion: openclaw.openclaw.io/v1alpha1
+      kind: OpenClawInstance
+      metadata:
+        name: my-openclaw
+      spec:
+        envFrom:
+          - secretRef:
+              name: openclaw-api-keys
+        storage:
+          persistence:
+            enabled: true
+            size: 10Gi
+  artifacthub.io/images: |
+    - name: openclaw-operator
+      image: ghcr.io/openclaw-rocks/openclaw-operator:v0.2.4
+  artifacthub.io/changes: |
+    - kind: added
+      description: Initial ArtifactHub listing with full operator metadata
