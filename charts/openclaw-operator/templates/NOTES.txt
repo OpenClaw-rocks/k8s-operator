@@ -39,9 +39,9 @@ To learn more about the release, try:
 ## Documentation
 
 For more information, visit:
-https://github.com/openclawrocks/k8s-operator
+https://github.com/OpenClaw-rocks/k8s-operator
 
 ## Getting Help
 
 If you encounter any issues, please file an issue at:
-https://github.com/openclawrocks/k8s-operator/issues
+https://github.com/OpenClaw-rocks/k8s-operator/issues

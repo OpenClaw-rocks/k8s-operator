@@ -92,7 +92,7 @@ The operator reconciles this into a fully managed stack of 9+ Kubernetes resourc
 
 ```bash
 helm install openclaw-operator \
-  oci://ghcr.io/openclawrocks/charts/openclaw-operator \
+  oci://ghcr.io/openclaw-rocks/charts/openclaw-operator \
   --namespace openclaw-operator-system \
   --create-namespace
 ```
@@ -105,7 +105,7 @@ helm install openclaw-operator \
 make install
 
 # Deploy the operator
-make deploy IMG=ghcr.io/openclawrocks/openclaw-operator:latest
+make deploy IMG=ghcr.io/openclaw-rocks/openclaw-operator:latest
 ```
 
 </details>
