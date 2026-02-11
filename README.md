@@ -6,15 +6,15 @@
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-1.28%2B-326CE5?logo=kubernetes&logoColor=white)](https://kubernetes.io)
 [![Go](https://img.shields.io/badge/Go-1.24-00ADD8?logo=go&logoColor=white)](https://go.dev)
 
-**Self-host [OpenClaw](https://openclaw.rocks) AI agents on Kubernetes with production-grade security, observability, and lifecycle management.**
+**Self-host [OpenClaw](https://openclaw.ai) AI agents on Kubernetes with production-grade security, observability, and lifecycle management.**
 
-OpenClaw is an AI agent platform that acts on your behalf across Telegram, Discord, WhatsApp, and Signal — managing your inbox, calendar, smart home, and more through 50+ integrations. While [openclaw.rocks](https://openclaw.rocks) offers fully managed hosting, this operator lets you run OpenClaw on your own infrastructure with the same operational rigor.
+OpenClaw is an AI agent platform that acts on your behalf across Telegram, Discord, WhatsApp, and Signal. It manages your inbox, calendar, smart home, and more through 50+ integrations. While [OpenClaw.rocks](https://openclaw.rocks) offers fully managed hosting, this operator lets you run OpenClaw on your own infrastructure with the same operational rigor.
 
 ---
 
 ## Why an Operator?
 
-Deploying AI agents to Kubernetes involves more than a Deployment and a Service. You need network isolation, secret management, persistent storage, health monitoring, optional browser automation, and config rollouts — all wired correctly. This operator encodes those concerns into a single `OpenClawInstance` custom resource so you can go from zero to production in minutes:
+Deploying AI agents to Kubernetes involves more than a Deployment and a Service. You need network isolation, secret management, persistent storage, health monitoring, optional browser automation, and config rollouts, all wired correctly. This operator encodes those concerns into a single `OpenClawInstance` custom resource so you can go from zero to production in minutes:
 
 ```yaml
 apiVersion: openclaw.openclaw.io/v1alpha1
@@ -31,16 +31,16 @@ spec:
       size: 10Gi
 ```
 
-The operator reconciles this into a fully managed stack of 9+ Kubernetes resources — secured, monitored, and self-healing.
+The operator reconciles this into a fully managed stack of 9+ Kubernetes resources: secured, monitored, and self-healing.
 
 ## Features
 
 | | Feature | Details |
 |---|---|---|
-| **Declarative** | Single CRD | One resource defines the entire deployment — Deployment, Service, RBAC, NetworkPolicy, PVC, PDB, Ingress, and more |
+| **Declarative** | Single CRD | One resource defines the entire deployment: Deployment, Service, RBAC, NetworkPolicy, PVC, PDB, Ingress, and more |
 | **Secure** | Hardened by default | Non-root (UID 1000), all capabilities dropped, seccomp RuntimeDefault, default-deny NetworkPolicy, validating webhook |
 | **Observable** | Built-in metrics | Prometheus metrics, ServiceMonitor integration, structured JSON logging, Kubernetes events |
-| **Flexible** | Provider-agnostic config | Use any AI provider — Anthropic, OpenAI, or others — via environment variables and inline or external config |
+| **Flexible** | Provider-agnostic config | Use any AI provider (Anthropic, OpenAI, or others) via environment variables and inline or external config |
 | **Resilient** | Self-healing lifecycle | PodDisruptionBudgets, health probes, automatic config rollouts via content hashing, 5-minute drift detection |
 | **Extensible** | Chromium sidecar | Optional headless browser for web automation, injected as a hardened sidecar with shared-memory tuning |
 
@@ -55,11 +55,11 @@ The operator reconciles this into a fully managed stack of 9+ Kubernetes resourc
                ▼
 ┌──────────────────────────────────────────────────────────────┐
 │  OpenClaw Operator                                           │
-│  ┌────────────┐  ┌──────────────┐  ┌──────────────────────┐ │
-│  │ Reconciler │  │   Webhooks   │  │  Prometheus Metrics  │ │
-│  │            │  │  (validate   │  │  (reconcile count,   │ │
-│  │  creates → │  │   & default) │  │   duration, phases)  │ │
-│  └────────────┘  └──────────────┘  └──────────────────────┘ │
+│  ┌────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
+│  │ Reconciler │  │   Webhooks   │  │  Prometheus Metrics  │  │
+│  │            │  │  (validate   │  │  (reconcile count,   │  │
+│  │  creates → │  │   & default) │  │   duration, phases)  │  │
+│  └────────────┘  └──────────────┘  └──────────────────────┘  │
 └──────────────┬───────────────────────────────────────────────┘
                │ manages
                ▼
@@ -71,10 +71,10 @@ The operator reconciles this into a fully managed stack of 9+ Kubernetes resourc
 │                                                              │
 │  ┌────────────────────────────────────────────────────────┐  │
 │  │  Deployment                                            │  │
-│  │  ┌──────────────────────┐  ┌────────────────────────┐ │  │
-│  │  │  OpenClaw Container  │  │  Chromium Sidecar      │ │  │
-│  │  │  (AI agent runtime)  │  │  (optional, port 9222) │ │  │
-│  │  └──────────────────────┘  └────────────────────────┘ │  │
+│  │  ┌──────────────────────┐  ┌────────────────────────┐  │  │
+│  │  │  OpenClaw Container  │  │  Chromium Sidecar      │  │  │
+│  │  │  (AI agent runtime)  │  │  (optional, port 9222) │  │  │
+│  │  └──────────────────────┘  └────────────────────────┘  │  │
 │  └────────────────────────────────────────────────────────┘  │
 │                                                              │
 │  Service (ports 18789, 18793) ─► Ingress (optional)          │
@@ -182,7 +182,7 @@ spec:
       key: openclaw.json
 ```
 
-Config changes are detected via SHA-256 hashing and automatically trigger a rolling update — no manual restart needed.
+Config changes are detected via SHA-256 hashing and automatically trigger a rolling update. No manual restart needed.
 
 ### Chromium sidecar
 
@@ -235,22 +235,22 @@ See the [full example](config/samples/openclaw_v1alpha1_openclawinstance_full.ya
 
 ## Security
 
-The operator follows a **secure-by-default** philosophy. Every instance ships with hardened settings out of the box — no extra configuration needed.
+The operator follows a **secure-by-default** philosophy. Every instance ships with hardened settings out of the box, with no extra configuration needed.
 
 ### Defaults
 
-- **Non-root execution** — containers run as UID 1000; root (UID 0) is blocked by the validating webhook
-- **All capabilities dropped** — no ambient Linux capabilities
-- **Seccomp RuntimeDefault** — syscall filtering enabled
-- **Default-deny NetworkPolicy** — only DNS (53) and HTTPS (443) egress allowed; ingress limited to same namespace
-- **Minimal RBAC** — each instance gets its own ServiceAccount with read-only access to its own ConfigMap
-- **Read-only root filesystem** — supported for the Chromium sidecar; scratch dirs via emptyDir
+- **Non-root execution**: containers run as UID 1000; root (UID 0) is blocked by the validating webhook
+- **All capabilities dropped**: no ambient Linux capabilities
+- **Seccomp RuntimeDefault**: syscall filtering enabled
+- **Default-deny NetworkPolicy**: only DNS (53) and HTTPS (443) egress allowed; ingress limited to same namespace
+- **Minimal RBAC**: each instance gets its own ServiceAccount with read-only access to its own ConfigMap
+- **Read-only root filesystem**: supported for the Chromium sidecar; scratch dirs via emptyDir
 
 ### Validating webhook
 
 | Check | Severity | Behavior |
 |-------|----------|----------|
-| `runAsUser: 0` | Error | Blocked — root execution not allowed |
+| `runAsUser: 0` | Error | Blocked: root execution not allowed |
 | NetworkPolicy disabled | Warning | Deployment proceeds with a warning |
 | Ingress without TLS | Warning | Deployment proceeds with a warning |
 | Chromium without digest pinning | Warning | Deployment proceeds with a warning |
@@ -355,15 +355,15 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full development guide.
 
 ## Roadmap
 
-- **v0.2.0** — Multi-instance scaling, HPA integration, backup & restore
-- **v0.3.0** — Multi-cluster support, GitOps-native config, cert-manager integration
-- **v1.0.0** — API graduation to v1, conformance test suite, CNCF Artifact Hub listing
+- **v0.2.0**: Multi-instance scaling, HPA integration, backup & restore
+- **v0.3.0**: Multi-cluster support, GitOps-native config, cert-manager integration
+- **v1.0.0**: API graduation to v1, conformance test suite, CNCF Artifact Hub listing
 
 See the full [roadmap](ROADMAP.md) for details.
 
 ## Don't Want to Self-Host?
 
-[OpenClaw](https://openclaw.rocks) offers fully managed hosting starting at **EUR 10/mo** — no Kubernetes cluster required. Setup, updates, and 24/7 uptime handled for you.
+[OpenClaw.rocks](https://openclaw.rocks) offers fully managed hosting starting at **EUR 10/mo**. No Kubernetes cluster required. Setup, updates, and 24/7 uptime handled for you.
 
 ## Contributing
 
@@ -371,4 +371,4 @@ Contributions are welcome. Please open an issue to discuss significant changes b
 
 ## License
 
-Apache License 2.0 — the same license used by Kubernetes, Prometheus, and most CNCF projects. See [LICENSE](LICENSE) for details.
+Apache License 2.0, the same license used by Kubernetes, Prometheus, and most CNCF projects. See [LICENSE](LICENSE) for details.
