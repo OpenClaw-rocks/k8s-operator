@@ -35,6 +35,8 @@ annotations:
       url: https://openclaw.rocks/blog/openclaw-kubernetes-operator
     - name: OperatorHub
       url: https://operatorhub.io/operator/openclaw-operator
+    - name: Artifact Hub
+      url: https://artifacthub.io/packages/olm/community-operators/openclaw-operator
     - name: support
       url: https://github.com/OpenClaw-rocks/k8s-operator/issues
   artifacthub.io/crds: |
