@@ -43,7 +43,7 @@ import (
 
 const (
 	// FinalizerName is the finalizer used by this controller
-	FinalizerName = "openclaw.openclaw.rocks/finalizer"
+	FinalizerName = "openclaw.rocks/finalizer"
 
 	// RequeueAfter is the default requeue interval
 	RequeueAfter = 5 * time.Minute
@@ -56,9 +56,9 @@ type OpenClawInstanceReconciler struct {
 	Recorder record.EventRecorder
 }
 
-// +kubebuilder:rbac:groups=openclaw.openclaw.rocks,resources=openclawinstances,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=openclaw.openclaw.rocks,resources=openclawinstances/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=openclaw.openclaw.rocks,resources=openclawinstances/finalizers,verbs=update
+// +kubebuilder:rbac:groups=openclaw.rocks,resources=openclawinstances,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=openclaw.rocks,resources=openclawinstances/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=openclaw.rocks,resources=openclawinstances/finalizers,verbs=update
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete

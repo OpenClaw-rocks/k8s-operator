@@ -40,7 +40,7 @@ Each reconciliation cycle follows a deterministic, ordered sequence. The control
 
 2. **Handle deletion** -- If `DeletionTimestamp` is set, transition to the `Terminating` phase, remove the finalizer, and let Kubernetes garbage-collect owned resources via owner references.
 
-3. **Add finalizer** -- If the finalizer `openclaw.openclaw.rocks/finalizer` is not present, add it and requeue. The finalizer ensures the controller gets a chance to run cleanup logic before the object is removed.
+3. **Add finalizer** -- If the finalizer `openclaw.rocks/finalizer` is not present, add it and requeue. The finalizer ensures the controller gets a chance to run cleanup logic before the object is removed.
 
 4. **Set initial phase** -- If `status.phase` is empty, set it to `Pending` and requeue. On the next pass, transition from `Pending` to `Provisioning`.
 
@@ -259,4 +259,4 @@ spec:
 
 ### Config Hash for Rollout
 
-The operator computes a SHA-256 hash of the configuration and stores it as the annotation `openclaw.openclaw.rocks/config-hash` on the pod template. When the configuration changes, the hash changes, which triggers a rolling update of the Deployment -- even though the Deployment spec itself has not changed. This ensures configuration changes are always picked up without manual restarts.
+The operator computes a SHA-256 hash of the configuration and stores it as the annotation `openclaw.rocks/config-hash` on the pod template. When the configuration changes, the hash changes, which triggers a rolling update of the Deployment -- even though the Deployment spec itself has not changed. This ensures configuration changes are always picked up without manual restarts.

@@ -21,7 +21,7 @@ OpenClaw is an AI agent platform that acts on your behalf across Telegram, Disco
 Deploying AI agents to Kubernetes involves more than a Deployment and a Service. You need network isolation, secret management, persistent storage, health monitoring, optional browser automation, and config rollouts, all wired correctly. This operator encodes those concerns into a single `OpenClawInstance` custom resource so you can go from zero to production in minutes:
 
 ```yaml
-apiVersion: openclaw.openclaw.rocks/v1alpha1
+apiVersion: openclaw.rocks/v1alpha1
 kind: OpenClawInstance
 metadata:
   name: my-agent
@@ -129,7 +129,7 @@ stringData:
 ### 3. Deploy an OpenClaw instance
 
 ```yaml
-apiVersion: openclaw.openclaw.rocks/v1alpha1
+apiVersion: openclaw.rocks/v1alpha1
 kind: OpenClawInstance
 metadata:
   name: my-agent

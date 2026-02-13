@@ -12,7 +12,7 @@ resources:
     namespaced: true
   controller: true
   domain: openclaw.rocks
-  group: openclaw
+  group: ""
   kind: OpenClawInstance
   path: github.com/openclawrocks/k8s-operator/api/v1alpha1
   version: v1alpha1

@@ -4,9 +4,9 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.17.2
-  name: openclawinstances.openclaw.openclaw.rocks
+  name: openclawinstances.openclaw.rocks
 spec:
-  group: openclaw.openclaw.rocks
+  group: openclaw.rocks
   names:
     kind: OpenClawInstance
     listKind: OpenClawInstanceList

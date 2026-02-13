@@ -46,7 +46,7 @@ func BuildPVC(instance *openclawv1alpha1.OpenClawInstance) *corev1.PersistentVol
 			Namespace: instance.Namespace,
 			Labels:    labels,
 			Annotations: map[string]string{
-				"openclaw.openclaw.rocks/backup-enabled": "true",
+				"openclaw.rocks/backup-enabled": "true",
 			},
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{

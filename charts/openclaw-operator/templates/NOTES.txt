@@ -18,7 +18,7 @@ To learn more about the release, try:
 2. Create an OpenClawInstance:
 
    cat <<EOF | kubectl apply -f -
-   apiVersion: openclaw.openclaw.rocks/v1alpha1
+   apiVersion: openclaw.rocks/v1alpha1
    kind: OpenClawInstance
    metadata:
      name: my-openclaw

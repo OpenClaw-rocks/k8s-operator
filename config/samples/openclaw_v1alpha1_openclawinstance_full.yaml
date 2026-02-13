@@ -1,5 +1,5 @@
 # Full OpenClawInstance example with all options
-apiVersion: openclaw.openclaw.rocks/v1alpha1
+apiVersion: openclaw.rocks/v1alpha1
 kind: OpenClawInstance
 metadata:
   name: production-openclaw

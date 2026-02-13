@@ -70,7 +70,7 @@ kubectl create secret generic openclaw-api-keys \
   --from-literal=ANTHROPIC_API_KEY=sk-your-key
 
 kubectl apply -f - <<EOF
-apiVersion: openclaw.openclaw.rocks/v1alpha1
+apiVersion: openclaw.rocks/v1alpha1
 kind: OpenClawInstance
 metadata:
   name: dev-assistant
@@ -162,7 +162,7 @@ kubectl create secret generic openclaw-api-keys \
   --from-literal=ANTHROPIC_API_KEY=sk-your-key
 
 kubectl apply -f - <<EOF
-apiVersion: openclaw.openclaw.rocks/v1alpha1
+apiVersion: openclaw.rocks/v1alpha1
 kind: OpenClawInstance
 metadata:
   name: my-assistant
@@ -278,7 +278,7 @@ kubectl create secret generic openclaw-api-keys \
   --from-literal=ANTHROPIC_API_KEY=sk-your-key
 
 kubectl apply -f - <<EOF
-apiVersion: openclaw.openclaw.rocks/v1alpha1
+apiVersion: openclaw.rocks/v1alpha1
 kind: OpenClawInstance
 metadata:
   name: my-assistant
@@ -398,7 +398,7 @@ kubectl create secret generic openclaw-api-keys \
   --from-literal=ANTHROPIC_API_KEY=sk-your-key
 
 kubectl apply -f - <<EOF
-apiVersion: openclaw.openclaw.rocks/v1alpha1
+apiVersion: openclaw.rocks/v1alpha1
 kind: OpenClawInstance
 metadata:
   name: my-assistant
@@ -487,7 +487,7 @@ kubectl create secret generic openclaw-api-keys \
   --from-literal=ANTHROPIC_API_KEY=sk-your-key
 
 kubectl apply -f - <<EOF
-apiVersion: openclaw.openclaw.rocks/v1alpha1
+apiVersion: openclaw.rocks/v1alpha1
 kind: OpenClawInstance
 metadata:
   name: my-assistant
@@ -524,7 +524,7 @@ kubectl get pods -n openclaw-system
 # Expected: 1/1 Running
 
 # 2. CRD is installed
-kubectl get crd openclawinstances.openclaw.openclaw.rocks
+kubectl get crd openclawinstances.openclaw.rocks
 # Expected: CRD listed with creation date
 
 # 3. Instance reaches Running phase
@@ -557,7 +557,7 @@ kubectl get all -n openclaw -l app.kubernetes.io/managed-by=openclaw-operator
 helm uninstall openclaw-operator -n openclaw-system
 
 # CRDs are kept by default. To remove them:
-kubectl delete crd openclawinstances.openclaw.openclaw.rocks
+kubectl delete crd openclawinstances.openclaw.rocks
 
 # Remove namespaces
 kubectl delete namespace openclaw openclaw-system

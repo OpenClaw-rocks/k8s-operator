@@ -72,7 +72,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - openclaw.openclaw.rocks
+  - openclaw.rocks
   resources:
   - openclawinstances
   verbs:
@@ -84,13 +84,13 @@ rules:
   - update
   - watch
 - apiGroups:
-  - openclaw.openclaw.rocks
+  - openclaw.rocks
   resources:
   - openclawinstances/finalizers
   verbs:
   - update
 - apiGroups:
-  - openclaw.openclaw.rocks
+  - openclaw.rocks
   resources:
   - openclawinstances/status
   verbs:

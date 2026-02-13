@@ -41,13 +41,13 @@ rules:
     resources: ["poddisruptionbudgets"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   # OpenClaw CRDs
-  - apiGroups: ["openclaw.openclaw.rocks"]
+  - apiGroups: ["openclaw.rocks"]
     resources: ["openclawinstances"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  - apiGroups: ["openclaw.openclaw.rocks"]
+  - apiGroups: ["openclaw.rocks"]
     resources: ["openclawinstances/status"]
     verbs: ["get", "update", "patch"]
-  - apiGroups: ["openclaw.openclaw.rocks"]
+  - apiGroups: ["openclaw.rocks"]
     resources: ["openclawinstances/finalizers"]
     verbs: ["update"]
 ---

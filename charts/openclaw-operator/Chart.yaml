@@ -42,11 +42,11 @@ annotations:
   artifacthub.io/crds: |
     - kind: OpenClawInstance
       version: v1alpha1
-      name: openclawinstances.openclaw.openclaw.rocks
+      name: openclawinstances.openclaw.rocks
       displayName: OpenClaw Instance
       description: Represents a managed OpenClaw AI agent instance
   artifacthub.io/crdsExamples: |
-    - apiVersion: openclaw.openclaw.rocks/v1alpha1
+    - apiVersion: openclaw.rocks/v1alpha1
       kind: OpenClawInstance
       metadata:
         name: my-openclaw
