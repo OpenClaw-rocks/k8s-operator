@@ -9,6 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: googleapis/release-please-action@v4
+        id: release
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
@@ -16,3 +17,34 @@ jobs:
           # downstream workflows (release.yaml). A PAT makes the tag
           # push appear as a user action, which triggers the release.
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+
+      # skip-github-release is set in release-please-config.json so that
+      # release-please does NOT create a GitHub release (which would
+      # conflict with GoReleaser's draft-then-publish flow on immutable
+      # releases). However, this also skips tag creation. We create the
+      # tag manually here so the release workflow triggers.
+      - name: Create release tag
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+        run: |
+          # Detect if the current push merged a release-please PR
+          COMMIT_MSG=$(gh api "repos/${{ github.repository }}/commits/${{ github.sha }}" \
+            --jq '.commit.message' | head -1)
+
+          if [[ "$COMMIT_MSG" =~ ^chore\(main\):\ release\ ([0-9]+\.[0-9]+\.[0-9]+) ]]; then
+            VERSION="${BASH_REMATCH[1]}"
+            TAG="v${VERSION}"
+
+            # Only create if tag doesn't already exist
+            if gh api "repos/${{ github.repository }}/git/refs/tags/${TAG}" &>/dev/null; then
+              echo "Tag ${TAG} already exists, skipping"
+            else
+              echo "Creating tag ${TAG} at ${{ github.sha }}"
+              gh api "repos/${{ github.repository }}/git/refs" \
+                -f ref="refs/tags/${TAG}" \
+                -f sha="${{ github.sha }}"
+              echo "Tag ${TAG} created — release workflow will trigger"
+            fi
+          else
+            echo "Not a release commit, skipping tag creation"
+          fi
