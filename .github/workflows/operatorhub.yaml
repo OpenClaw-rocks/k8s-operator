@@ -64,7 +64,8 @@ jobs:
 
           git checkout -b "${BRANCH}"
 
-          # Copy prepared bundle
+          # Copy prepared bundle (mkdir for first-time submissions)
+          mkdir -p operators/openclaw-operator
           cp -r ../submission/operators/openclaw-operator/${VERSION} operators/openclaw-operator/${VERSION}
 
           git add "operators/openclaw-operator/${VERSION}"
