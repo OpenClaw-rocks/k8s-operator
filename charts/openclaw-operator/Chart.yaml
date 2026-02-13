@@ -2,8 +2,8 @@ apiVersion: v2
 name: openclaw-operator
 description: A Kubernetes operator for deploying and managing OpenClaw AI assistant instances
 type: application
-version: 0.2.4
-appVersion: "v0.2.4"
+version: 0.4.0
+appVersion: "v0.4.0"
 keywords:
   - kubernetes
   - operator
@@ -60,7 +60,13 @@ annotations:
             size: 10Gi
   artifacthub.io/images: |
     - name: openclaw-operator
-      image: ghcr.io/openclaw-rocks/openclaw-operator:v0.2.4
+      image: ghcr.io/openclaw-rocks/openclaw-operator:v0.4.0
   artifacthub.io/changes: |
+    - kind: fixed
+      description: Prevent endless Deployment reconciliation loop
+    - kind: fixed
+      description: Apply CreateOrUpdate pattern to ServiceMonitor reconciler
     - kind: added
-      description: Initial ArtifactHub listing with full operator metadata
+      description: CI reconcile guard to prevent unconditional Update regression
+    - kind: added
+      description: Support for custom sidecar containers
