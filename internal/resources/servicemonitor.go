@@ -18,9 +18,19 @@ package resources
 
 import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	openclawv1alpha1 "github.com/openclawrocks/k8s-operator/api/v1alpha1"
 )
+
+// ServiceMonitorGVK returns the GroupVersionKind for ServiceMonitor
+func ServiceMonitorGVK() schema.GroupVersionKind {
+	return schema.GroupVersionKind{
+		Group:   "monitoring.coreos.com",
+		Version: "v1",
+		Kind:    "ServiceMonitor",
+	}
+}
 
 // ServiceMonitorName returns the name of the ServiceMonitor
 func ServiceMonitorName(instance *openclawv1alpha1.OpenClawInstance) string {
