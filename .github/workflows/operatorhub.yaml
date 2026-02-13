@@ -75,7 +75,7 @@ jobs:
 
           git add "operators/openclaw-operator/${VERSION}"
           git commit -m "operator openclaw-operator (${VERSION})"
-          git push origin "${BRANCH}"
+          git push --force origin "${BRANCH}"
 
           # --head requires owner:branch for cross-fork PRs
           FORK_OWNER=$(gh api user --jq '.login')
