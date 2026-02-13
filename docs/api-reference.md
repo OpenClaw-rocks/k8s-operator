@@ -2,7 +2,7 @@
 
 ## OpenClawInstance (v1alpha1)
 
-**Group**: `openclaw.openclaw.io`
+**Group**: `openclaw.openclaw.rocks`
 **Version**: `v1alpha1`
 **Kind**: `OpenClawInstance`
 **Scope**: Namespaced
@@ -367,7 +367,7 @@ Standard `metav1.Condition` array. Condition types:
 ## Full Example
 
 ```yaml
-apiVersion: openclaw.openclaw.io/v1alpha1
+apiVersion: openclaw.openclaw.rocks/v1alpha1
 kind: OpenClawInstance
 metadata:
   name: my-assistant

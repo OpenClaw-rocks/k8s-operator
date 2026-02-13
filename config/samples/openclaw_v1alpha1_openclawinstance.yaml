@@ -1,5 +1,5 @@
 # Minimal OpenClawInstance example
-apiVersion: openclaw.openclaw.io/v1alpha1
+apiVersion: openclaw.openclaw.rocks/v1alpha1
 kind: OpenClawInstance
 metadata:
   name: my-openclaw

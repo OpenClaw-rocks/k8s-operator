@@ -14,7 +14,7 @@ metadata:
     alm-examples: |-
       [
         {
-          "apiVersion": "openclaw.openclaw.io/v1alpha1",
+          "apiVersion": "openclaw.openclaw.rocks/v1alpha1",
           "kind": "OpenClawInstance",
           "metadata": {
             "name": "my-openclaw",
@@ -37,7 +37,7 @@ metadata:
           }
         },
         {
-          "apiVersion": "openclaw.openclaw.io/v1alpha1",
+          "apiVersion": "openclaw.openclaw.rocks/v1alpha1",
           "kind": "OpenClawInstance",
           "metadata": {
             "name": "production-openclaw",
@@ -176,7 +176,7 @@ spec:
       supported: true
   customresourcedefinitions:
     owned:
-      - name: openclawinstances.openclaw.openclaw.io
+      - name: openclawinstances.openclaw.openclaw.rocks
         version: v1alpha1
         kind: OpenClawInstance
         displayName: OpenClaw Instance
@@ -328,7 +328,7 @@ spec:
                 - update
                 - watch
             - apiGroups:
-                - openclaw.openclaw.io
+                - openclaw.openclaw.rocks
               resources:
                 - openclawinstances
               verbs:
@@ -340,13 +340,13 @@ spec:
                 - update
                 - watch
             - apiGroups:
-                - openclaw.openclaw.io
+                - openclaw.openclaw.rocks
               resources:
                 - openclawinstances/finalizers
               verbs:
                 - update
             - apiGroups:
-                - openclaw.openclaw.io
+                - openclaw.openclaw.rocks
               resources:
                 - openclawinstances/status
               verbs:

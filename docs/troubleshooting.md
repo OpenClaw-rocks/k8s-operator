@@ -64,7 +64,7 @@ kubectl get openclawinstance my-assistant -n openclaw \
 
 2. **CRD not installed**:
    ```bash
-   kubectl get crd openclawinstances.openclaw.openclaw.io
+   kubectl get crd openclawinstances.openclaw.openclaw.rocks
    ```
    If the CRD is missing, install it:
    ```bash
@@ -350,7 +350,7 @@ kubectl describe pod -n openclaw-system -l app.kubernetes.io/name=openclaw-opera
 
 2. **Missing CRD**: If the CRD is not installed, the controller fails to start:
    ```bash
-   kubectl get crd openclawinstances.openclaw.openclaw.io
+   kubectl get crd openclawinstances.openclaw.openclaw.rocks
    ```
 
 3. **Insufficient RBAC**: The operator needs cluster-wide permissions for certain resources. Verify the ClusterRole and ClusterRoleBinding are in place.

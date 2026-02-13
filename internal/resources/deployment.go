@@ -59,7 +59,7 @@ func BuildDeployment(instance *openclawv1alpha1.OpenClawInstance) *appsv1.Deploy
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: labels,
 					Annotations: map[string]string{
-						"openclaw.openclaw.io/config-hash": configHash,
+						"openclaw.openclaw.rocks/config-hash": configHash,
 					},
 				},
 				Spec: corev1.PodSpec{

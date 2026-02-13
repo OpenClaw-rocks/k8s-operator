@@ -259,7 +259,7 @@ func TestBuildDeployment_Defaults(t *testing.T) {
 
 	// Config hash annotation
 	ann := dep.Spec.Template.Annotations
-	if _, ok := ann["openclaw.openclaw.io/config-hash"]; !ok {
+	if _, ok := ann["openclaw.openclaw.rocks/config-hash"]; !ok {
 		t.Error("config-hash annotation missing from pod template")
 	}
 
@@ -1680,7 +1680,7 @@ func TestBuildPVC_Default(t *testing.T) {
 	}
 
 	// Backup annotation
-	if pvc.Annotations["openclaw.openclaw.io/backup-enabled"] != "true" {
+	if pvc.Annotations["openclaw.openclaw.rocks/backup-enabled"] != "true" {
 		t.Error("pvc missing backup-enabled annotation")
 	}
 
