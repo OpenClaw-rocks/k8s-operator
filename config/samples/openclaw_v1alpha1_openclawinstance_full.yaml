@@ -104,6 +104,29 @@ spec:
         cpu: "1000m"
         memory: "2Gi"
 
+  # Custom sidecar containers
+  # sidecars:
+  #   - name: cloud-sql-proxy
+  #     image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.14.3
+  #     args:
+  #       - "--structured-logs"
+  #       - "my-project:us-central1:my-db"
+  #     ports:
+  #       - containerPort: 5432
+  #     resources:
+  #       requests:
+  #         cpu: "100m"
+  #         memory: "128Mi"
+  #       limits:
+  #         cpu: "500m"
+  #         memory: "256Mi"
+  #     securityContext:
+  #       runAsNonRoot: true
+  # sidecarVolumes:
+  #   - name: proxy-creds
+  #     secret:
+  #       secretName: cloud-sql-proxy-sa
+
   # Networking configuration
   networking:
     service:
