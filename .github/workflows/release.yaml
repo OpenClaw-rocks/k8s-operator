@@ -97,7 +97,10 @@ jobs:
 
       - name: Publish release
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # PAT required: events from GITHUB_TOKEN don't trigger other
+          # workflows. Using PAT ensures the release:published event
+          # fires the OperatorHub submission workflow.
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
         run: gh release edit "${{ github.ref_name }}" --draft=false
 
   helm-release:
