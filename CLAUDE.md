@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Go-based Kubernetes operator for managing OpenClaw instances, built with controller-runtime (kubebuilder). CRD API is `v1alpha1`.
+Go-based Kubernetes operator for managing OpenClaw instances, built with controller-runtime (kubebuilder). CRD API group is `openclaw.rocks`, version `v1alpha1`.
 
 - **Module:** `github.com/openclawrocks/k8s-operator`
 - **Go version:** 1.24
@@ -30,6 +30,7 @@ internal/controller/   → Reconciliation logic (single controller)
 internal/resources/    → Pure resource builder functions (Deployment, Service, etc.)
 config/crd/bases/      → Generated CRD YAML (committed to git)
 charts/                → Helm chart
+bundle/                → OLM bundle for OperatorHub submissions
 test/e2e/              → E2E tests (run against kind cluster)
 ```
 
@@ -164,15 +165,30 @@ All checks run on every push to main and every PR:
 
 - CRDs in `charts/openclaw-operator/crds/` — installed on `helm install`, but NOT upgraded by Helm
 - Users must `kubectl apply -f` CRDs before `helm upgrade` when CRD schema changes
-- Chart version and `appVersion` should match the operator release version
+- `appVersion` in `Chart.yaml` uses plain semver (no `v` prefix); the deployment template prepends `v`
+- Chart version and appVersion are managed by release-please via `extra-files` in `release-please-config.json`
 
 ## Releasing
 
-Tag-driven via goreleaser:
-1. Tag `vX.Y.Z` on main
-2. GoReleaser builds binaries + Docker images (draft release due to immutable releases)
-3. SBOM uploaded via `gh release upload --clobber`
-4. Cosign signs images
-5. Release published
+Automated via release-please + GoReleaser:
+
+1. Conventional commits (`feat:`, `fix:`) on main trigger release-please to create/update a release PR
+2. Merging the release PR bumps versions in `CHANGELOG.md`, `.release-please-manifest.json`, and `Chart.yaml`
+3. A post-action step creates the `vX.Y.Z` tag (using PAT to trigger downstream workflows)
+4. The tag triggers `release.yaml`: GoReleaser builds binaries + multi-arch Docker images (draft release)
+5. Cosign signs images, SBOM is generated and attested
+6. SBOM uploaded to draft release, then release is published (using PAT)
+7. Published release triggers `operatorhub.yaml`: auto-submits bundle PR to `k8s-operatorhub/community-operators`
+8. Helm chart is packaged and pushed to `oci://ghcr.io/openclaw-rocks/charts`
+
+**Key config files:**
+- `release-please-config.json` — `skip-github-release: true` (GoReleaser manages the release lifecycle)
+- `.release-please-manifest.json` — tracks current version
+- `.goreleaser.yaml` — `release.draft: true` (immutable releases require draft→publish flow)
+
+**Secrets required:**
+- `RELEASE_PLEASE_TOKEN` — classic PAT with `repo` scope; used for tag creation, release publishing, and OperatorHub cross-repo PRs
+
+**Manual trigger:** `gh workflow run "OperatorHub Submission" -f tag=vX.Y.Z`
 
 Image: `ghcr.io/openclaw-rocks/openclaw-operator`
