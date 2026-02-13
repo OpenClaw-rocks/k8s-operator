@@ -369,6 +369,12 @@ See the full [roadmap](ROADMAP.md) for details.
 
 Contributions are welcome. Please open an issue to discuss significant changes before submitting a PR. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
+## Disclaimer: AI-Assisted Development
+
+This repository is developed and maintained collaboratively by a human and [Claude Code](https://claude.ai/claude-code). This includes writing code, reviewing and commenting on issues, triaging bugs, and merging pull requests. The human reads everything and acts as the final guard, but Claude does the heavy lifting — from diagnosis to implementation to CI.
+
+In the future, this repo may be fully autonomously operated, whether we humans like that or not.
+
 ## License
 
 Apache License 2.0, the same license used by Kubernetes, Prometheus, and most CNCF projects. See [LICENSE](LICENSE) for details.
