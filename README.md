@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/images/banner.svg" alt="OpenClaw Kubernetes Operator — crabs sailing the Kubernetes seas" width="100%">
+</p>
+
 # OpenClaw Kubernetes Operator
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
