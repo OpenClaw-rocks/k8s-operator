@@ -58,6 +58,9 @@ jobs:
           VERSION="${{ steps.version.outputs.version }}"
           BRANCH="openclaw-operator-v${VERSION}"
 
+          # Configure gh as git credential helper so git push works with the PAT
+          gh auth setup-git
+
           # Clone the community-operators repo (fork is auto-created by gh)
           gh repo fork k8s-operatorhub/community-operators --clone=true --remote=true -- community-operators
           cd community-operators
