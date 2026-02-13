@@ -1,0 +1,81 @@
+name: OperatorHub Submission
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  submit:
+    name: Submit to OperatorHub
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract version
+        id: version
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=$GITHUB_REF_NAME" >> $GITHUB_OUTPUT
+
+      - name: Prepare bundle
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          TAG="${{ steps.version.outputs.tag }}"
+          BUNDLE_DIR="submission/operators/openclaw-operator/${VERSION}"
+
+          mkdir -p "${BUNDLE_DIR}/manifests" "${BUNDLE_DIR}/metadata"
+
+          # Copy and version the CSV
+          sed \
+            -e "s/openclaw-operator\.v[0-9]\+\.[0-9]\+\.[0-9]\+/openclaw-operator.v${VERSION}/g" \
+            -e "s|ghcr.io/openclaw-rocks/openclaw-operator:v[0-9]\+\.[0-9]\+\.[0-9]\+|ghcr.io/openclaw-rocks/openclaw-operator:${TAG}|g" \
+            -e "s/createdAt: .*/createdAt: \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"/" \
+            bundle/manifests/openclaw-operator.v*.clusterserviceversion.yaml \
+            > "${BUNDLE_DIR}/manifests/openclaw-operator.v${VERSION}.clusterserviceversion.yaml"
+
+          # Copy CRD and metadata as-is
+          cp bundle/manifests/openclaw.rocks_openclawinstances.yaml "${BUNDLE_DIR}/manifests/"
+          cp bundle/metadata/annotations.yaml "${BUNDLE_DIR}/metadata/"
+
+          echo "Bundle prepared at ${BUNDLE_DIR}:"
+          find "${BUNDLE_DIR}" -type f
+
+      - name: Fork and submit to community-operators
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          BRANCH="openclaw-operator-v${VERSION}"
+
+          # Clone the community-operators repo (fork is auto-created by gh)
+          gh repo fork k8s-operatorhub/community-operators --clone=true --remote=true -- community-operators
+          cd community-operators
+
+          git checkout -b "${BRANCH}"
+
+          # Copy prepared bundle
+          cp -r ../submission/operators/openclaw-operator/${VERSION} operators/openclaw-operator/${VERSION}
+
+          git add "operators/openclaw-operator/${VERSION}"
+          git commit -m "operator openclaw-operator (${VERSION})"
+          git push origin "${BRANCH}"
+
+          gh pr create \
+            --repo k8s-operatorhub/community-operators \
+            --title "operator openclaw-operator (${VERSION})" \
+            --body "$(cat <<EOF
+          ### Update to openclaw-operator
+
+          **Version:** ${VERSION}
+          **Operator:** [OpenClaw Kubernetes Operator](https://github.com/openclaw-rocks/k8s-operator)
+
+          #### Changes
+          See [release notes](https://github.com/openclaw-rocks/k8s-operator/releases/tag/v${VERSION}).
+
+          #### Testing
+          - CI tests pass on the source repository
+          - Container image is published and signed at \`ghcr.io/openclaw-rocks/openclaw-operator:v${VERSION}\`
+          EOF
+          )"
