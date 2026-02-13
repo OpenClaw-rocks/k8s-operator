@@ -42,6 +42,15 @@ type OpenClawInstanceSpec struct {
 	// +optional
 	Chromium ChromiumSpec `json:"chromium,omitempty"`
 
+	// Sidecars is a list of additional sidecar containers to inject into the pod.
+	// Use this for custom sidecars like database proxies, log forwarders, or service meshes.
+	// +optional
+	Sidecars []corev1.Container `json:"sidecars,omitempty"`
+
+	// SidecarVolumes is a list of additional volumes to make available to sidecar containers.
+	// +optional
+	SidecarVolumes []corev1.Volume `json:"sidecarVolumes,omitempty"`
+
 	// Networking specifies network-related configuration
 	// +optional
 	Networking NetworkingSpec `json:"networking,omitempty"`

@@ -164,6 +164,9 @@ func buildContainers(instance *openclawv1alpha1.OpenClawInstance) []corev1.Conta
 		containers = append(containers, buildChromiumContainer(instance))
 	}
 
+	// Add custom sidecars
+	containers = append(containers, instance.Spec.Sidecars...)
+
 	return containers
 }
 
@@ -392,6 +395,9 @@ func buildVolumes(instance *openclawv1alpha1.OpenClawInstance) []corev1.Volume {
 			},
 		)
 	}
+
+	// Custom sidecar volumes
+	volumes = append(volumes, instance.Spec.SidecarVolumes...)
 
 	return volumes
 }
