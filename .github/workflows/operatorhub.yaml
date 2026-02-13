@@ -62,6 +62,8 @@ jobs:
           gh repo fork k8s-operatorhub/community-operators --clone=true --remote=true -- community-operators
           cd community-operators
 
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -b "${BRANCH}"
 
           # Copy prepared bundle (mkdir for first-time submissions)
