@@ -28,6 +28,31 @@ jobs:
           install-mode: goinstall
           args: --timeout=5m
 
+  reconcile-guard:
+    name: Reconcile Guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for unconditional Update on managed resources
+        run: |
+          # Detect bare r.Update/r.Create calls in the controller that bypass
+          # controllerutil.CreateOrUpdate. Only r.Update(ctx, instance) and
+          # r.Status().Update(ctx, instance) are allowed (CR-level updates).
+          # See: https://github.com/openclaw-rocks/k8s-operator/issues/28
+          VIOLATIONS=$(grep -n 'r\.Update(ctx,' internal/controller/openclawinstance_controller.go \
+            | grep -v 'instance)' \
+            | grep -v '// reconcile-guard:allow' || true)
+          if [ -n "$VIOLATIONS" ]; then
+            echo "::error::Found bare r.Update() calls on managed resources. Use controllerutil.CreateOrUpdate instead."
+            echo "Violations:"
+            echo "$VIOLATIONS"
+            echo ""
+            echo "If this is intentional, add '// reconcile-guard:allow' to the line."
+            exit 1
+          fi
+          echo "No unconditional Update calls on managed resources found."
+
   test:
     name: Test
     runs-on: ubuntu-latest
