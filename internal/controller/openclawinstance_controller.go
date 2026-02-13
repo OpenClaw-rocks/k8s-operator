@@ -261,31 +261,53 @@ func (r *OpenClawInstanceReconciler) reconcileRBAC(ctx context.Context, instance
 
 	if createSA {
 		// Reconcile ServiceAccount
-		sa := resources.BuildServiceAccount(instance)
-		if err := controllerutil.SetControllerReference(instance, sa, r.Scheme); err != nil {
-			return err
+		sa := &corev1.ServiceAccount{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      resources.ServiceAccountName(instance),
+				Namespace: instance.Namespace,
+			},
 		}
-		if err := r.createOrUpdate(ctx, sa); err != nil {
+		if _, err := controllerutil.CreateOrUpdate(ctx, r.Client, sa, func() error {
+			desired := resources.BuildServiceAccount(instance)
+			sa.Labels = desired.Labels
+			sa.Annotations = desired.Annotations
+			return controllerutil.SetControllerReference(instance, sa, r.Scheme)
+		}); err != nil {
 			return err
 		}
 		instance.Status.ManagedResources.ServiceAccount = sa.Name
 
 		// Reconcile Role
-		role := resources.BuildRole(instance)
-		if err := controllerutil.SetControllerReference(instance, role, r.Scheme); err != nil {
-			return err
+		role := &rbacv1.Role{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      resources.RoleName(instance),
+				Namespace: instance.Namespace,
+			},
 		}
-		if err := r.createOrUpdate(ctx, role); err != nil {
+		if _, err := controllerutil.CreateOrUpdate(ctx, r.Client, role, func() error {
+			desired := resources.BuildRole(instance)
+			role.Labels = desired.Labels
+			role.Rules = desired.Rules
+			return controllerutil.SetControllerReference(instance, role, r.Scheme)
+		}); err != nil {
 			return err
 		}
 		instance.Status.ManagedResources.Role = role.Name
 
 		// Reconcile RoleBinding
-		roleBinding := resources.BuildRoleBinding(instance)
-		if err := controllerutil.SetControllerReference(instance, roleBinding, r.Scheme); err != nil {
-			return err
+		roleBinding := &rbacv1.RoleBinding{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      resources.RoleBindingName(instance),
+				Namespace: instance.Namespace,
+			},
 		}
-		if err := r.createOrUpdate(ctx, roleBinding); err != nil {
+		if _, err := controllerutil.CreateOrUpdate(ctx, r.Client, roleBinding, func() error {
+			desired := resources.BuildRoleBinding(instance)
+			roleBinding.Labels = desired.Labels
+			roleBinding.RoleRef = desired.RoleRef
+			roleBinding.Subjects = desired.Subjects
+			return controllerutil.SetControllerReference(instance, roleBinding, r.Scheme)
+		}); err != nil {
 			return err
 		}
 		instance.Status.ManagedResources.RoleBinding = roleBinding.Name
@@ -319,11 +341,18 @@ func (r *OpenClawInstanceReconciler) reconcileNetworkPolicy(ctx context.Context,
 		return nil
 	}
 
-	np := resources.BuildNetworkPolicy(instance)
-	if err := controllerutil.SetControllerReference(instance, np, r.Scheme); err != nil {
-		return err
+	np := &networkingv1.NetworkPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      resources.NetworkPolicyName(instance),
+			Namespace: instance.Namespace,
+		},
 	}
-	if err := r.createOrUpdate(ctx, np); err != nil {
+	if _, err := controllerutil.CreateOrUpdate(ctx, r.Client, np, func() error {
+		desired := resources.BuildNetworkPolicy(instance)
+		np.Labels = desired.Labels
+		np.Spec = desired.Spec
+		return controllerutil.SetControllerReference(instance, np, r.Scheme)
+	}); err != nil {
 		return err
 	}
 	instance.Status.ManagedResources.NetworkPolicy = np.Name
@@ -348,11 +377,18 @@ func (r *OpenClawInstanceReconciler) reconcileConfigMap(ctx context.Context, ins
 		return nil
 	}
 
-	cm := resources.BuildConfigMap(instance)
-	if err := controllerutil.SetControllerReference(instance, cm, r.Scheme); err != nil {
-		return err
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      resources.ConfigMapName(instance),
+			Namespace: instance.Namespace,
+		},
 	}
-	if err := r.createOrUpdate(ctx, cm); err != nil {
+	if _, err := controllerutil.CreateOrUpdate(ctx, r.Client, cm, func() error {
+		desired := resources.BuildConfigMap(instance)
+		cm.Labels = desired.Labels
+		cm.Data = desired.Data
+		return controllerutil.SetControllerReference(instance, cm, r.Scheme)
+	}); err != nil {
 		return err
 	}
 	instance.Status.ManagedResources.ConfigMap = cm.Name
@@ -433,11 +469,18 @@ func (r *OpenClawInstanceReconciler) reconcilePDB(ctx context.Context, instance 
 		return nil
 	}
 
-	pdb := resources.BuildPDB(instance)
-	if err := controllerutil.SetControllerReference(instance, pdb, r.Scheme); err != nil {
-		return err
+	pdb := &policyv1.PodDisruptionBudget{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      resources.PDBName(instance),
+			Namespace: instance.Namespace,
+		},
 	}
-	if err := r.createOrUpdate(ctx, pdb); err != nil {
+	if _, err := controllerutil.CreateOrUpdate(ctx, r.Client, pdb, func() error {
+		desired := resources.BuildPDB(instance)
+		pdb.Labels = desired.Labels
+		pdb.Spec = desired.Spec
+		return controllerutil.SetControllerReference(instance, pdb, r.Scheme)
+	}); err != nil {
 		return err
 	}
 	instance.Status.ManagedResources.PodDisruptionBudget = pdb.Name
@@ -447,22 +490,24 @@ func (r *OpenClawInstanceReconciler) reconcilePDB(ctx context.Context, instance 
 
 // reconcileDeployment reconciles the Deployment
 func (r *OpenClawInstanceReconciler) reconcileDeployment(ctx context.Context, instance *openclawv1alpha1.OpenClawInstance) error {
-	deployment := resources.BuildDeployment(instance)
-	if err := controllerutil.SetControllerReference(instance, deployment, r.Scheme); err != nil {
-		return err
+	deployment := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      resources.DeploymentName(instance),
+			Namespace: instance.Namespace,
+		},
 	}
-	if err := r.createOrUpdate(ctx, deployment); err != nil {
+	if _, err := controllerutil.CreateOrUpdate(ctx, r.Client, deployment, func() error {
+		desired := resources.BuildDeployment(instance)
+		deployment.Labels = desired.Labels
+		deployment.Spec = desired.Spec
+		return controllerutil.SetControllerReference(instance, deployment, r.Scheme)
+	}); err != nil {
 		return err
 	}
 	instance.Status.ManagedResources.Deployment = deployment.Name
 
-	// Check deployment status
-	existing := &appsv1.Deployment{}
-	if err := r.Get(ctx, client.ObjectKeyFromObject(deployment), existing); err != nil {
-		return err
-	}
-
-	ready := existing.Status.ReadyReplicas > 0
+	// Check deployment status (deployment already fetched by CreateOrUpdate)
+	ready := deployment.Status.ReadyReplicas > 0
 	status := metav1.ConditionFalse
 	reason := "DeploymentNotReady"
 	message := "Deployment is not ready yet"
@@ -485,11 +530,24 @@ func (r *OpenClawInstanceReconciler) reconcileDeployment(ctx context.Context, in
 
 // reconcileService reconciles the Service
 func (r *OpenClawInstanceReconciler) reconcileService(ctx context.Context, instance *openclawv1alpha1.OpenClawInstance) error {
-	service := resources.BuildService(instance)
-	if err := controllerutil.SetControllerReference(instance, service, r.Scheme); err != nil {
-		return err
+	service := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      resources.ServiceName(instance),
+			Namespace: instance.Namespace,
+		},
 	}
-	if err := r.createOrUpdate(ctx, service); err != nil {
+	if _, err := controllerutil.CreateOrUpdate(ctx, r.Client, service, func() error {
+		desired := resources.BuildService(instance)
+		service.Labels = desired.Labels
+		service.Annotations = desired.Annotations
+		// Preserve ClusterIP — it is assigned by the API server and immutable
+		clusterIP := service.Spec.ClusterIP
+		clusterIPs := service.Spec.ClusterIPs
+		service.Spec = desired.Spec
+		service.Spec.ClusterIP = clusterIP
+		service.Spec.ClusterIPs = clusterIPs
+		return controllerutil.SetControllerReference(instance, service, r.Scheme)
+	}); err != nil {
 		return err
 	}
 	instance.Status.ManagedResources.Service = service.Name
@@ -522,11 +580,19 @@ func (r *OpenClawInstanceReconciler) reconcileIngress(ctx context.Context, insta
 		return nil
 	}
 
-	ingress := resources.BuildIngress(instance)
-	if err := controllerutil.SetControllerReference(instance, ingress, r.Scheme); err != nil {
-		return err
+	ingress := &networkingv1.Ingress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      resources.IngressName(instance),
+			Namespace: instance.Namespace,
+		},
 	}
-	if err := r.createOrUpdate(ctx, ingress); err != nil {
+	if _, err := controllerutil.CreateOrUpdate(ctx, r.Client, ingress, func() error {
+		desired := resources.BuildIngress(instance)
+		ingress.Labels = desired.Labels
+		ingress.Annotations = desired.Annotations
+		ingress.Spec = desired.Spec
+		return controllerutil.SetControllerReference(instance, ingress, r.Scheme)
+	}); err != nil {
 		return err
 	}
 
@@ -590,21 +656,6 @@ func (r *OpenClawInstanceReconciler) reconcileDelete(ctx context.Context, instan
 
 	logger.Info("Finalizer removed, cleanup complete")
 	return ctrl.Result{}, nil
-}
-
-// createOrUpdate creates or updates a resource
-func (r *OpenClawInstanceReconciler) createOrUpdate(ctx context.Context, obj client.Object) error {
-	existing := obj.DeepCopyObject().(client.Object)
-	if err := r.Get(ctx, client.ObjectKeyFromObject(obj), existing); err != nil {
-		if apierrors.IsNotFound(err) {
-			return r.Create(ctx, obj)
-		}
-		return err
-	}
-
-	// Preserve resource version for update
-	obj.SetResourceVersion(existing.GetResourceVersion())
-	return r.Update(ctx, obj)
 }
 
 // SetupWithManager sets up the controller with the Manager

@@ -46,7 +46,9 @@ func BuildDeployment(instance *openclawv1alpha1.OpenClawInstance) *appsv1.Deploy
 			Labels:    labels,
 		},
 		Spec: appsv1.DeploymentSpec{
-			Replicas: Ptr(int32(1)), // OpenClaw is single-instance
+			Replicas:                Ptr(int32(1)), // OpenClaw is single-instance
+			RevisionHistoryLimit:    Ptr(int32(10)),
+			ProgressDeadlineSeconds: Ptr(int32(600)),
 			Strategy: appsv1.DeploymentStrategy{
 				Type: appsv1.RecreateDeploymentStrategyType, // Stateful workload
 			},
@@ -61,14 +63,18 @@ func BuildDeployment(instance *openclawv1alpha1.OpenClawInstance) *appsv1.Deploy
 					},
 				},
 				Spec: corev1.PodSpec{
-					ServiceAccountName: ServiceAccountName(instance),
-					SecurityContext:    buildPodSecurityContext(instance),
-					InitContainers:     buildInitContainers(instance),
-					Containers:         buildContainers(instance),
-					Volumes:            buildVolumes(instance),
-					NodeSelector:       instance.Spec.Availability.NodeSelector,
-					Tolerations:        instance.Spec.Availability.Tolerations,
-					Affinity:           instance.Spec.Availability.Affinity,
+					ServiceAccountName:            ServiceAccountName(instance),
+					SecurityContext:               buildPodSecurityContext(instance),
+					InitContainers:                buildInitContainers(instance),
+					Containers:                    buildContainers(instance),
+					Volumes:                       buildVolumes(instance),
+					NodeSelector:                  instance.Spec.Availability.NodeSelector,
+					Tolerations:                   instance.Spec.Availability.Tolerations,
+					Affinity:                      instance.Spec.Availability.Affinity,
+					RestartPolicy:                 corev1.RestartPolicyAlways,
+					DNSPolicy:                     corev1.DNSClusterFirst,
+					SchedulerName:                 corev1.DefaultSchedulerName,
+					TerminationGracePeriodSeconds: Ptr(int64(30)),
 				},
 			},
 		},
@@ -173,10 +179,12 @@ func buildContainers(instance *openclawv1alpha1.OpenClawInstance) []corev1.Conta
 // buildMainContainer creates the main OpenClaw container
 func buildMainContainer(instance *openclawv1alpha1.OpenClawInstance) corev1.Container {
 	container := corev1.Container{
-		Name:            "openclaw",
-		Image:           GetImage(instance),
-		ImagePullPolicy: getPullPolicy(instance),
-		SecurityContext: buildContainerSecurityContext(instance),
+		Name:                     "openclaw",
+		Image:                    GetImage(instance),
+		ImagePullPolicy:          getPullPolicy(instance),
+		SecurityContext:          buildContainerSecurityContext(instance),
+		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
+		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 		Ports: []corev1.ContainerPort{
 			{
 				Name:          "gateway",
@@ -235,9 +243,12 @@ func buildInitContainers(instance *openclawv1alpha1.OpenClawInstance) []corev1.C
 
 	return []corev1.Container{
 		{
-			Name:    "init-config",
-			Image:   "busybox:1.37",
-			Command: []string{"sh", "-c", fmt.Sprintf("cp /config/%s /data/openclaw.json", key)},
+			Name:                     "init-config",
+			Image:                    "busybox:1.37",
+			Command:                  []string{"sh", "-c", fmt.Sprintf("cp /config/%s /data/openclaw.json", key)},
+			ImagePullPolicy:          corev1.PullIfNotPresent,
+			TerminationMessagePath:   corev1.TerminationMessagePathDefault,
+			TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 			SecurityContext: &corev1.SecurityContext{
 				AllowPrivilegeEscalation: Ptr(false),
 				ReadOnlyRootFilesystem:   Ptr(true),
@@ -286,9 +297,11 @@ func buildChromiumContainer(instance *openclawv1alpha1.OpenClawInstance) corev1.
 	}
 
 	return corev1.Container{
-		Name:            "chromium",
-		Image:           image,
-		ImagePullPolicy: corev1.PullIfNotPresent,
+		Name:                     "chromium",
+		Image:                    image,
+		ImagePullPolicy:          corev1.PullIfNotPresent,
+		TerminationMessagePath:   corev1.TerminationMessagePathDefault,
+		TerminationMessagePolicy: corev1.TerminationMessageReadFile,
 		SecurityContext: &corev1.SecurityContext{
 			AllowPrivilegeEscalation: Ptr(false),
 			ReadOnlyRootFilesystem:   Ptr(false), // Chromium needs writable dirs for profiles, cache, crash dumps
@@ -351,6 +364,7 @@ func buildVolumes(instance *openclawv1alpha1.OpenClawInstance) []corev1.Volume {
 	}
 
 	// Config volume
+	defaultMode := int32(0644)
 	if instance.Spec.Config.ConfigMapRef != nil {
 		volumes = append(volumes, corev1.Volume{
 			Name: "config",
@@ -359,6 +373,7 @@ func buildVolumes(instance *openclawv1alpha1.OpenClawInstance) []corev1.Volume {
 					LocalObjectReference: corev1.LocalObjectReference{
 						Name: instance.Spec.Config.ConfigMapRef.Name,
 					},
+					DefaultMode: &defaultMode,
 				},
 			},
 		})
@@ -370,6 +385,7 @@ func buildVolumes(instance *openclawv1alpha1.OpenClawInstance) []corev1.Volume {
 					LocalObjectReference: corev1.LocalObjectReference{
 						Name: ConfigMapName(instance),
 					},
+					DefaultMode: &defaultMode,
 				},
 			},
 		})
@@ -490,6 +506,7 @@ func buildLivenessProbe(instance *openclawv1alpha1.OpenClawInstance) *corev1.Pro
 		InitialDelaySeconds: 30,
 		PeriodSeconds:       10,
 		TimeoutSeconds:      5,
+		SuccessThreshold:    1,
 		FailureThreshold:    3,
 	}
 
@@ -527,6 +544,7 @@ func buildReadinessProbe(instance *openclawv1alpha1.OpenClawInstance) *corev1.Pr
 		InitialDelaySeconds: 5,
 		PeriodSeconds:       5,
 		TimeoutSeconds:      3,
+		SuccessThreshold:    1,
 		FailureThreshold:    3,
 	}
 
@@ -564,6 +582,7 @@ func buildStartupProbe(instance *openclawv1alpha1.OpenClawInstance) *corev1.Prob
 		InitialDelaySeconds: 0,
 		PeriodSeconds:       5,
 		TimeoutSeconds:      3,
+		SuccessThreshold:    1,
 		FailureThreshold:    30, // 30 * 5s = 150s startup time
 	}
 

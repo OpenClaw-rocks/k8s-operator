@@ -42,8 +42,9 @@ func BuildService(instance *openclawv1alpha1.OpenClawInstance) *corev1.Service {
 			Annotations: instance.Spec.Networking.Service.Annotations,
 		},
 		Spec: corev1.ServiceSpec{
-			Type:     serviceType,
-			Selector: selectorLabels,
+			Type:            serviceType,
+			Selector:        selectorLabels,
+			SessionAffinity: corev1.ServiceAffinityNone,
 			Ports: []corev1.ServicePort{
 				{
 					Name:       "gateway",

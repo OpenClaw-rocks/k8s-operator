@@ -2375,3 +2375,157 @@ func findVolume(volumes []corev1.Volume, name string) *corev1.Volume {
 	}
 	return nil
 }
+
+// ---------------------------------------------------------------------------
+// Kubernetes default field tests (regression for issue #28 — reconcile loop)
+// ---------------------------------------------------------------------------
+
+// TestBuildDeployment_KubernetesDefaults verifies that the Deployment builder
+// explicitly sets all fields that Kubernetes would default on the server side.
+// If any of these are missing, controllerutil.CreateOrUpdate sees a diff on
+// every reconcile, causing an endless update loop.
+func TestBuildDeployment_KubernetesDefaults(t *testing.T) {
+	instance := newTestInstance("k8s-defaults")
+	dep := BuildDeployment(instance)
+
+	// DeploymentSpec defaults
+	if dep.Spec.RevisionHistoryLimit == nil || *dep.Spec.RevisionHistoryLimit != 10 {
+		t.Errorf("RevisionHistoryLimit = %v, want 10", dep.Spec.RevisionHistoryLimit)
+	}
+	if dep.Spec.ProgressDeadlineSeconds == nil || *dep.Spec.ProgressDeadlineSeconds != 600 {
+		t.Errorf("ProgressDeadlineSeconds = %v, want 600", dep.Spec.ProgressDeadlineSeconds)
+	}
+
+	// PodSpec defaults
+	podSpec := dep.Spec.Template.Spec
+	if podSpec.RestartPolicy != corev1.RestartPolicyAlways {
+		t.Errorf("RestartPolicy = %v, want Always", podSpec.RestartPolicy)
+	}
+	if podSpec.DNSPolicy != corev1.DNSClusterFirst {
+		t.Errorf("DNSPolicy = %v, want ClusterFirst", podSpec.DNSPolicy)
+	}
+	if podSpec.SchedulerName != corev1.DefaultSchedulerName {
+		t.Errorf("SchedulerName = %v, want %v", podSpec.SchedulerName, corev1.DefaultSchedulerName)
+	}
+	if podSpec.TerminationGracePeriodSeconds == nil || *podSpec.TerminationGracePeriodSeconds != 30 {
+		t.Errorf("TerminationGracePeriodSeconds = %v, want 30", podSpec.TerminationGracePeriodSeconds)
+	}
+
+	// Container defaults
+	main := dep.Spec.Template.Spec.Containers[0]
+	if main.TerminationMessagePath != corev1.TerminationMessagePathDefault {
+		t.Errorf("TerminationMessagePath = %q, want %q", main.TerminationMessagePath, corev1.TerminationMessagePathDefault)
+	}
+	if main.TerminationMessagePolicy != corev1.TerminationMessageReadFile {
+		t.Errorf("TerminationMessagePolicy = %v, want File", main.TerminationMessagePolicy)
+	}
+
+	// Probe successThreshold defaults
+	if main.LivenessProbe.SuccessThreshold != 1 {
+		t.Errorf("LivenessProbe.SuccessThreshold = %d, want 1", main.LivenessProbe.SuccessThreshold)
+	}
+	if main.ReadinessProbe.SuccessThreshold != 1 {
+		t.Errorf("ReadinessProbe.SuccessThreshold = %d, want 1", main.ReadinessProbe.SuccessThreshold)
+	}
+	if main.StartupProbe.SuccessThreshold != 1 {
+		t.Errorf("StartupProbe.SuccessThreshold = %d, want 1", main.StartupProbe.SuccessThreshold)
+	}
+}
+
+// TestBuildDeployment_InitContainerDefaults verifies init containers include
+// Kubernetes default fields to avoid reconcile-loop drift.
+func TestBuildDeployment_InitContainerDefaults(t *testing.T) {
+	instance := newTestInstance("init-defaults")
+	instance.Spec.Config.Raw = &openclawv1alpha1.RawConfig{
+		RawExtension: runtime.RawExtension{Raw: []byte(`{}`)},
+	}
+
+	dep := BuildDeployment(instance)
+	if len(dep.Spec.Template.Spec.InitContainers) == 0 {
+		t.Fatal("expected init container when raw config is set")
+	}
+
+	init := dep.Spec.Template.Spec.InitContainers[0]
+	if init.TerminationMessagePath != corev1.TerminationMessagePathDefault {
+		t.Errorf("init container TerminationMessagePath = %q, want %q", init.TerminationMessagePath, corev1.TerminationMessagePathDefault)
+	}
+	if init.TerminationMessagePolicy != corev1.TerminationMessageReadFile {
+		t.Errorf("init container TerminationMessagePolicy = %v, want File", init.TerminationMessagePolicy)
+	}
+	if init.ImagePullPolicy != corev1.PullIfNotPresent {
+		t.Errorf("init container ImagePullPolicy = %v, want IfNotPresent", init.ImagePullPolicy)
+	}
+}
+
+// TestBuildDeployment_ChromiumContainerDefaults verifies the chromium sidecar
+// includes Kubernetes default fields.
+func TestBuildDeployment_ChromiumContainerDefaults(t *testing.T) {
+	instance := newTestInstance("chromium-defaults")
+	instance.Spec.Chromium.Enabled = true
+
+	dep := BuildDeployment(instance)
+	if len(dep.Spec.Template.Spec.Containers) < 2 {
+		t.Fatal("expected chromium sidecar container")
+	}
+
+	chromium := dep.Spec.Template.Spec.Containers[1]
+	if chromium.TerminationMessagePath != corev1.TerminationMessagePathDefault {
+		t.Errorf("chromium TerminationMessagePath = %q, want %q", chromium.TerminationMessagePath, corev1.TerminationMessagePathDefault)
+	}
+	if chromium.TerminationMessagePolicy != corev1.TerminationMessageReadFile {
+		t.Errorf("chromium TerminationMessagePolicy = %v, want File", chromium.TerminationMessagePolicy)
+	}
+}
+
+// TestBuildDeployment_ConfigMapDefaultMode verifies the ConfigMap volume
+// explicitly sets DefaultMode to match the Kubernetes default (0644).
+func TestBuildDeployment_ConfigMapDefaultMode(t *testing.T) {
+	instance := newTestInstance("cm-default-mode")
+	instance.Spec.Config.Raw = &openclawv1alpha1.RawConfig{
+		RawExtension: runtime.RawExtension{Raw: []byte(`{}`)},
+	}
+
+	dep := BuildDeployment(instance)
+	configVol := findVolume(dep.Spec.Template.Spec.Volumes, "config")
+	if configVol == nil {
+		t.Fatal("config volume not found")
+	}
+	if configVol.ConfigMap == nil {
+		t.Fatal("config volume should use ConfigMap")
+	}
+	if configVol.ConfigMap.DefaultMode == nil || *configVol.ConfigMap.DefaultMode != 0644 {
+		t.Errorf("ConfigMap DefaultMode = %v, want 0644", configVol.ConfigMap.DefaultMode)
+	}
+}
+
+// TestBuildService_KubernetesDefaults verifies Service builder includes
+// Kubernetes default fields.
+func TestBuildService_KubernetesDefaults(t *testing.T) {
+	instance := newTestInstance("svc-defaults")
+	svc := BuildService(instance)
+
+	if svc.Spec.SessionAffinity != corev1.ServiceAffinityNone {
+		t.Errorf("SessionAffinity = %v, want None", svc.Spec.SessionAffinity)
+	}
+}
+
+// TestBuildDeployment_Idempotent verifies calling BuildDeployment twice with
+// the same input produces identical specs (no random maps, no pointer aliasing
+// issues). This is essential for CreateOrUpdate comparisons to work.
+func TestBuildDeployment_Idempotent(t *testing.T) {
+	instance := newTestInstance("idempotent")
+	instance.Spec.Config.Raw = &openclawv1alpha1.RawConfig{
+		RawExtension: runtime.RawExtension{Raw: []byte(`{"key":"val"}`)},
+	}
+	instance.Spec.Chromium.Enabled = true
+
+	dep1 := BuildDeployment(instance)
+	dep2 := BuildDeployment(instance)
+
+	b1, _ := json.Marshal(dep1.Spec)
+	b2, _ := json.Marshal(dep2.Spec)
+
+	if !bytes.Equal(b1, b2) {
+		t.Error("BuildDeployment is not idempotent — two calls with the same input produce different specs")
+	}
+}
