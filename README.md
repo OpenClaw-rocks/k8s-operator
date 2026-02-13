@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/banner.svg" alt="OpenClaw Kubernetes Operator — crabs sailing the Kubernetes seas" width="100%">
+  <img src="docs/images/banner.svg" alt="OpenClaw Kubernetes Operator — OpenClaws sailing the Kubernetes seas" width="100%">
 </p>
 
 # OpenClaw Kubernetes Operator
