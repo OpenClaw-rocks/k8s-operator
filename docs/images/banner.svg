@@ -1,0 +1,235 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 500" width="1200" height="500">
+  <defs>
+    <linearGradient id="sky" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#0a1628"/>
+      <stop offset="60%" style="stop-color:#1a2f4e"/>
+      <stop offset="100%" style="stop-color:#1e3a5f"/>
+    </linearGradient>
+    <linearGradient id="ocean" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#1565C0"/>
+      <stop offset="100%" style="stop-color:#0D47A1"/>
+    </linearGradient>
+    <linearGradient id="crabBody" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF6F00"/>
+      <stop offset="100%" style="stop-color:#E65100"/>
+    </linearGradient>
+    <linearGradient id="crabBodyLight" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF8F00"/>
+      <stop offset="100%" style="stop-color:#FF6F00"/>
+    </linearGradient>
+    <linearGradient id="wheel" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#BBDEFB"/>
+      <stop offset="100%" style="stop-color:#90CAF9"/>
+    </linearGradient>
+    <linearGradient id="ship" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#5D4037"/>
+      <stop offset="100%" style="stop-color:#3E2723"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="softGlow">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Sky background -->
+  <rect width="1200" height="500" fill="url(#sky)"/>
+
+  <!-- Stars -->
+  <circle cx="100" cy="50" r="1.5" fill="#fff" opacity="0.8"/>
+  <circle cx="250" cy="80" r="1" fill="#fff" opacity="0.6"/>
+  <circle cx="400" cy="30" r="1.5" fill="#fff" opacity="0.7"/>
+  <circle cx="550" cy="70" r="1" fill="#fff" opacity="0.5"/>
+  <circle cx="700" cy="40" r="2" fill="#fff" opacity="0.8"/>
+  <circle cx="850" cy="60" r="1" fill="#fff" opacity="0.6"/>
+  <circle cx="950" cy="25" r="1.5" fill="#fff" opacity="0.7"/>
+  <circle cx="1050" cy="75" r="1" fill="#fff" opacity="0.5"/>
+  <circle cx="1150" cy="45" r="1.5" fill="#fff" opacity="0.8"/>
+  <circle cx="180" cy="120" r="1" fill="#fff" opacity="0.4"/>
+  <circle cx="320" cy="100" r="1.5" fill="#fff" opacity="0.6"/>
+  <circle cx="780" cy="95" r="1" fill="#fff" opacity="0.5"/>
+  <circle cx="1100" cy="110" r="1.5" fill="#fff" opacity="0.4"/>
+
+  <!-- Ocean -->
+  <path d="M0 340 Q100 320 200 340 Q300 360 400 340 Q500 320 600 340 Q700 360 800 340 Q900 320 1000 340 Q1100 360 1200 340 L1200 500 L0 500 Z" fill="url(#ocean)" opacity="0.9"/>
+  <path d="M0 360 Q150 340 300 360 Q450 380 600 360 Q750 340 900 360 Q1050 380 1200 360 L1200 500 L0 500 Z" fill="#0D47A1" opacity="0.5"/>
+  <path d="M0 380 Q100 365 200 380 Q300 395 400 380 Q500 365 600 380 Q700 395 800 380 Q900 365 1000 380 Q1100 395 1200 380 L1200 500 L0 500 Z" fill="#0D47A1" opacity="0.3"/>
+
+  <!-- Ship hull -->
+  <path d="M440 360 L480 400 L720 400 L760 360 Z" fill="url(#ship)" stroke="#4E342E" stroke-width="2"/>
+  <path d="M460 400 L470 430 L730 430 L740 400 Z" fill="#4E342E" stroke="#3E2723" stroke-width="1.5"/>
+  <!-- Ship deck line -->
+  <line x1="470" y1="360" x2="730" y2="360" stroke="#6D4C41" stroke-width="2"/>
+  <!-- Ship railing posts -->
+  <line x1="490" y1="345" x2="490" y2="360" stroke="#8D6E63" stroke-width="2"/>
+  <line x1="530" y1="345" x2="530" y2="360" stroke="#8D6E63" stroke-width="2"/>
+  <line x1="670" y1="345" x2="670" y2="360" stroke="#8D6E63" stroke-width="2"/>
+  <line x1="710" y1="345" x2="710" y2="360" stroke="#8D6E63" stroke-width="2"/>
+  <!-- Railing -->
+  <line x1="480" y1="345" x2="720" y2="345" stroke="#8D6E63" stroke-width="1.5"/>
+
+  <!-- Kubernetes-style ship wheel (behind crab) -->
+  <g transform="translate(600, 270)">
+    <!-- Outer ring -->
+    <circle cx="0" cy="0" r="65" fill="none" stroke="url(#wheel)" stroke-width="8" opacity="0.9" filter="url(#glow)"/>
+    <!-- Inner ring -->
+    <circle cx="0" cy="0" r="18" fill="none" stroke="url(#wheel)" stroke-width="6" opacity="0.9"/>
+    <!-- 7 spokes (like Kubernetes logo) -->
+    <line x1="0" y1="-18" x2="0" y2="-65" stroke="url(#wheel)" stroke-width="7" stroke-linecap="round" opacity="0.9"/>
+    <line x1="15.9" y1="-8.7" x2="57.4" y2="-31.4" stroke="url(#wheel)" stroke-width="7" stroke-linecap="round" opacity="0.9"/>
+    <line x1="17.3" y1="5.6" x2="62.4" y2="20.3" stroke="url(#wheel)" stroke-width="7" stroke-linecap="round" opacity="0.9"/>
+    <line x1="7.8" y1="16.2" x2="28.2" y2="58.6" stroke="url(#wheel)" stroke-width="7" stroke-linecap="round" opacity="0.9"/>
+    <line x1="-7.8" y1="16.2" x2="-28.2" y2="58.6" stroke="url(#wheel)" stroke-width="7" stroke-linecap="round" opacity="0.9"/>
+    <line x1="-17.3" y1="5.6" x2="-62.4" y2="20.3" stroke="url(#wheel)" stroke-width="7" stroke-linecap="round" opacity="0.9"/>
+    <line x1="-15.9" y1="-8.7" x2="-57.4" y2="-31.4" stroke="url(#wheel)" stroke-width="7" stroke-linecap="round" opacity="0.9"/>
+    <!-- Spoke end circles -->
+    <circle cx="0" cy="-65" r="9" fill="url(#wheel)" opacity="0.9"/>
+    <circle cx="57.4" cy="-31.4" r="9" fill="url(#wheel)" opacity="0.9"/>
+    <circle cx="62.4" cy="20.3" r="9" fill="url(#wheel)" opacity="0.9"/>
+    <circle cx="28.2" cy="58.6" r="9" fill="url(#wheel)" opacity="0.9"/>
+    <circle cx="-28.2" cy="58.6" r="9" fill="url(#wheel)" opacity="0.9"/>
+    <circle cx="-62.4" cy="20.3" r="9" fill="url(#wheel)" opacity="0.9"/>
+    <circle cx="-57.4" cy="-31.4" r="9" fill="url(#wheel)" opacity="0.9"/>
+  </g>
+
+  <!-- Main crab (captain) — body -->
+  <ellipse cx="600" cy="280" rx="52" ry="40" fill="url(#crabBody)"/>
+  <!-- Shell highlight -->
+  <ellipse cx="600" cy="270" rx="38" ry="25" fill="url(#crabBodyLight)" opacity="0.6"/>
+
+  <!-- Crab face -->
+  <!-- Eyes on stalks -->
+  <line x1="580" y1="255" x2="575" y2="235" stroke="#E65100" stroke-width="5" stroke-linecap="round"/>
+  <line x1="620" y1="255" x2="625" y2="235" stroke="#E65100" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="575" cy="232" r="7" fill="#FFF"/>
+  <circle cx="625" cy="232" r="7" fill="#FFF"/>
+  <circle cx="577" cy="231" r="4" fill="#1a1a2e"/>
+  <circle cx="623" cy="231" r="4" fill="#1a1a2e"/>
+  <!-- Tiny eye highlights -->
+  <circle cx="579" cy="229" r="1.5" fill="#fff"/>
+  <circle cx="625" cy="229" r="1.5" fill="#fff"/>
+
+  <!-- Crab smile -->
+  <path d="M588 290 Q600 300 612 290" fill="none" stroke="#BF360C" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- Captain hat -->
+  <ellipse cx="600" cy="245" rx="40" ry="8" fill="#1a237e"/>
+  <rect x="572" y="215" width="56" height="30" rx="4" fill="#1a237e"/>
+  <rect x="575" y="225" width="50" height="4" fill="#FFD700"/>
+  <!-- Hat emblem (anchor shape) -->
+  <circle cx="600" cy="220" r="5" fill="none" stroke="#FFD700" stroke-width="1.5"/>
+  <line x1="600" y1="215" x2="600" y2="210" stroke="#FFD700" stroke-width="1.5"/>
+  <line x1="596" y1="211" x2="604" y2="211" stroke="#FFD700" stroke-width="1.5"/>
+
+  <!-- Left claw arm gripping wheel -->
+  <path d="M548 280 Q510 260 490 240 Q480 230 500 225" fill="none" stroke="#E65100" stroke-width="10" stroke-linecap="round"/>
+  <!-- Left claw pincer -->
+  <path d="M500 225 L488 215 Q483 210 488 208 L500 218" fill="#FF6F00" stroke="#E65100" stroke-width="2"/>
+  <path d="M500 225 L508 212 Q512 207 508 205 L498 218" fill="#FF6F00" stroke="#E65100" stroke-width="2"/>
+
+  <!-- Right claw arm gripping wheel -->
+  <path d="M652 280 Q690 260 710 240 Q720 230 700 225" fill="none" stroke="#E65100" stroke-width="10" stroke-linecap="round"/>
+  <!-- Right claw pincer -->
+  <path d="M700 225 L712 215 Q717 210 712 208 L700 218" fill="#FF6F00" stroke="#E65100" stroke-width="2"/>
+  <path d="M700 225 L692 212 Q688 207 692 205 L702 218" fill="#FF6F00" stroke="#E65100" stroke-width="2"/>
+
+  <!-- Crab legs (3 per side) -->
+  <path d="M555 300 Q530 310 510 330 Q505 340 515 345" fill="none" stroke="#E65100" stroke-width="5" stroke-linecap="round"/>
+  <path d="M555 310 Q535 325 520 350 Q518 358 525 358" fill="none" stroke="#E65100" stroke-width="4" stroke-linecap="round"/>
+  <path d="M560 318 Q545 338 540 358 Q540 365 547 363" fill="none" stroke="#E65100" stroke-width="4" stroke-linecap="round"/>
+
+  <path d="M645 300 Q670 310 690 330 Q695 340 685 345" fill="none" stroke="#E65100" stroke-width="5" stroke-linecap="round"/>
+  <path d="M645 310 Q665 325 680 350 Q682 358 675 358" fill="none" stroke="#E65100" stroke-width="4" stroke-linecap="round"/>
+  <path d="M640 318 Q655 338 660 358 Q660 365 653 363" fill="none" stroke="#E65100" stroke-width="4" stroke-linecap="round"/>
+
+  <!-- Small crab 1 (port side lookout) -->
+  <g transform="translate(310, 330) scale(0.4)">
+    <ellipse cx="0" cy="0" rx="40" ry="30" fill="url(#crabBody)"/>
+    <ellipse cx="0" cy="-8" rx="28" ry="18" fill="url(#crabBodyLight)" opacity="0.5"/>
+    <line x1="-15" y1="-20" x2="-18" y2="-38" stroke="#E65100" stroke-width="5" stroke-linecap="round"/>
+    <line x1="15" y1="-20" x2="18" y2="-38" stroke="#E65100" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="-18" cy="-40" r="6" fill="#FFF"/>
+    <circle cx="18" cy="-40" r="6" fill="#FFF"/>
+    <circle cx="-16" cy="-41" r="3.5" fill="#1a1a2e"/>
+    <circle cx="20" cy="-41" r="3.5" fill="#1a1a2e"/>
+    <circle cx="-15" cy="-42" r="1.2" fill="#fff"/>
+    <circle cx="21" cy="-42" r="1.2" fill="#fff"/>
+    <path d="M-8 8 Q0 15 8 8" fill="none" stroke="#BF360C" stroke-width="2" stroke-linecap="round"/>
+    <!-- Tiny claws raised in excitement -->
+    <path d="M-40 -5 Q-55 -20 -50 -30" fill="none" stroke="#E65100" stroke-width="6" stroke-linecap="round"/>
+    <path d="M-50 -30 L-58 -38" fill="none" stroke="#FF6F00" stroke-width="4" stroke-linecap="round"/>
+    <path d="M-50 -30 L-44 -40" fill="none" stroke="#FF6F00" stroke-width="4" stroke-linecap="round"/>
+    <path d="M40 -5 Q55 -20 50 -30" fill="none" stroke="#E65100" stroke-width="6" stroke-linecap="round"/>
+    <path d="M50 -30 L58 -38" fill="none" stroke="#FF6F00" stroke-width="4" stroke-linecap="round"/>
+    <path d="M50 -30 L44 -40" fill="none" stroke="#FF6F00" stroke-width="4" stroke-linecap="round"/>
+  </g>
+
+  <!-- Small crab 2 (starboard side, peeking over railing) -->
+  <g transform="translate(850, 335) scale(0.35)">
+    <ellipse cx="0" cy="0" rx="40" ry="30" fill="url(#crabBody)"/>
+    <ellipse cx="0" cy="-8" rx="28" ry="18" fill="url(#crabBodyLight)" opacity="0.5"/>
+    <line x1="-15" y1="-20" x2="-20" y2="-40" stroke="#E65100" stroke-width="5" stroke-linecap="round"/>
+    <line x1="15" y1="-20" x2="20" y2="-40" stroke="#E65100" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="-20" cy="-42" r="6" fill="#FFF"/>
+    <circle cx="20" cy="-42" r="6" fill="#FFF"/>
+    <circle cx="-22" cy="-43" r="3.5" fill="#1a1a2e"/>
+    <circle cx="18" cy="-43" r="3.5" fill="#1a1a2e"/>
+    <circle cx="-23" cy="-44" r="1.2" fill="#fff"/>
+    <circle cx="17" cy="-44" r="1.2" fill="#fff"/>
+    <path d="M-8 8 Q0 15 8 8" fill="none" stroke="#BF360C" stroke-width="2" stroke-linecap="round"/>
+    <!-- Waving claw -->
+    <path d="M-40 -5 Q-60 -15 -55 -35" fill="none" stroke="#E65100" stroke-width="6" stroke-linecap="round"/>
+    <path d="M-55 -35 L-62 -42" fill="none" stroke="#FF6F00" stroke-width="4" stroke-linecap="round"/>
+    <path d="M-55 -35 L-48 -44" fill="none" stroke="#FF6F00" stroke-width="4" stroke-linecap="round"/>
+    <path d="M40 -5 Q55 5 60 -5" fill="none" stroke="#E65100" stroke-width="6" stroke-linecap="round"/>
+    <path d="M60 -5 L68 -12" fill="none" stroke="#FF6F00" stroke-width="4" stroke-linecap="round"/>
+    <path d="M60 -5 L65 4" fill="none" stroke="#FF6F00" stroke-width="4" stroke-linecap="round"/>
+  </g>
+
+  <!-- Small crab 3 (in the water, swimming alongside) -->
+  <g transform="translate(200, 395) scale(0.3)">
+    <ellipse cx="0" cy="0" rx="35" ry="25" fill="#FF6F00" opacity="0.8"/>
+    <line x1="-12" y1="-18" x2="-15" y2="-33" stroke="#E65100" stroke-width="5" stroke-linecap="round"/>
+    <line x1="12" y1="-18" x2="15" y2="-33" stroke="#E65100" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="-15" cy="-35" r="5" fill="#FFF" opacity="0.9"/>
+    <circle cx="15" cy="-35" r="5" fill="#FFF" opacity="0.9"/>
+    <circle cx="-14" cy="-36" r="3" fill="#1a1a2e"/>
+    <circle cx="16" cy="-36" r="3" fill="#1a1a2e"/>
+    <path d="M-35 0 Q-50 -15 -45 -25" fill="none" stroke="#E65100" stroke-width="5" stroke-linecap="round"/>
+    <path d="M35 0 Q50 -15 45 -25" fill="none" stroke="#E65100" stroke-width="5" stroke-linecap="round"/>
+  </g>
+
+  <!-- Small crab 4 (in the water on the right) -->
+  <g transform="translate(1000, 405) scale(0.25)">
+    <ellipse cx="0" cy="0" rx="35" ry="25" fill="#FF6F00" opacity="0.7"/>
+    <line x1="-12" y1="-18" x2="-14" y2="-32" stroke="#E65100" stroke-width="5" stroke-linecap="round"/>
+    <line x1="12" y1="-18" x2="14" y2="-32" stroke="#E65100" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="-14" cy="-34" r="5" fill="#FFF" opacity="0.8"/>
+    <circle cx="14" cy="-34" r="5" fill="#FFF" opacity="0.8"/>
+    <circle cx="-13" cy="-35" r="3" fill="#1a1a2e"/>
+    <circle cx="15" cy="-35" r="3" fill="#1a1a2e"/>
+    <path d="M-35 0 Q-48 -10 -42 -22" fill="none" stroke="#E65100" stroke-width="5" stroke-linecap="round"/>
+    <path d="M35 0 Q48 -10 42 -22" fill="none" stroke="#E65100" stroke-width="5" stroke-linecap="round"/>
+  </g>
+
+  <!-- Moon reflection on water -->
+  <ellipse cx="950" cy="130" rx="35" ry="35" fill="#FFF9C4" opacity="0.15" filter="url(#softGlow)"/>
+  <ellipse cx="950" cy="130" rx="28" ry="28" fill="#FFF9C4" opacity="0.2"/>
+
+  <!-- Title text -->
+  <text x="600" y="475" text-anchor="middle" fill="#E3F2FD" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="700" letter-spacing="3" opacity="0.9">OPENCLAW KUBERNETES OPERATOR</text>
+
+  <!-- Subtle wave foam -->
+  <path d="M0 345 Q30 338 60 345 Q90 352 120 345 Q150 338 180 345" fill="none" stroke="#fff" stroke-width="1" opacity="0.15"/>
+  <path d="M300 350 Q330 343 360 350 Q390 357 420 350" fill="none" stroke="#fff" stroke-width="1" opacity="0.12"/>
+  <path d="M800 348 Q830 341 860 348 Q890 355 920 348" fill="none" stroke="#fff" stroke-width="1" opacity="0.12"/>
+</svg>
