@@ -2,8 +2,8 @@ apiVersion: v2
 name: openclaw-operator
 description: A Kubernetes operator for deploying and managing OpenClaw AI assistant instances
 type: application
-version: 0.2.4
-appVersion: "v0.2.4"
+version: 0.3.0
+appVersion: "0.3.0"
 keywords:
   - kubernetes
   - operator
