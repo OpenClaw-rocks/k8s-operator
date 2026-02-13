@@ -2493,8 +2493,8 @@ func TestBuildDeployment_ConfigMapDefaultMode(t *testing.T) {
 	if configVol.ConfigMap == nil {
 		t.Fatal("config volume should use ConfigMap")
 	}
-	if configVol.ConfigMap.DefaultMode == nil || *configVol.ConfigMap.DefaultMode != 0644 {
-		t.Errorf("ConfigMap DefaultMode = %v, want 0644", configVol.ConfigMap.DefaultMode)
+	if configVol.ConfigMap.DefaultMode == nil || *configVol.ConfigMap.DefaultMode != 0o644 {
+		t.Errorf("ConfigMap DefaultMode = %v, want 0o644", configVol.ConfigMap.DefaultMode)
 	}
 }
 

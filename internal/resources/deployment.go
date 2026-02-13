@@ -364,7 +364,7 @@ func buildVolumes(instance *openclawv1alpha1.OpenClawInstance) []corev1.Volume {
 	}
 
 	// Config volume
-	defaultMode := int32(0644)
+	defaultMode := int32(0o644)
 	if instance.Spec.Config.ConfigMapRef != nil {
 		volumes = append(volumes, corev1.Volume{
 			Name: "config",
