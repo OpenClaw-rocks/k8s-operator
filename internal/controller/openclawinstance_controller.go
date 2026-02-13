@@ -608,30 +608,32 @@ func (r *OpenClawInstanceReconciler) reconcileServiceMonitor(ctx context.Context
 		return nil
 	}
 
-	sm := resources.BuildServiceMonitor(instance)
+	sm := &unstructured.Unstructured{}
+	sm.SetGroupVersionKind(resources.ServiceMonitorGVK())
+	sm.SetName(resources.ServiceMonitorName(instance))
 	sm.SetNamespace(instance.Namespace)
 
-	// Set owner reference manually for unstructured
-	ownerRef := metav1.OwnerReference{
-		APIVersion: instance.APIVersion,
-		Kind:       instance.Kind,
-		Name:       instance.Name,
-		UID:        instance.UID,
-		Controller: resources.Ptr(true),
-	}
-	sm.SetOwnerReferences([]metav1.OwnerReference{ownerRef})
+	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, sm, func() error {
+		desired := resources.BuildServiceMonitor(instance)
 
-	// Create or update
-	existing := &unstructured.Unstructured{}
-	existing.SetGroupVersionKind(sm.GroupVersionKind())
-	if err := r.Get(ctx, client.ObjectKeyFromObject(sm), existing); err != nil {
-		if apierrors.IsNotFound(err) {
-			return r.Create(ctx, sm)
+		// Copy spec from desired into existing
+		if spec, ok := desired.Object["spec"]; ok {
+			sm.Object["spec"] = spec
 		}
-		return err
-	}
-	sm.SetResourceVersion(existing.GetResourceVersion())
-	return r.Update(ctx, sm)
+		sm.SetLabels(desired.GetLabels())
+
+		// Set owner reference
+		ownerRef := metav1.OwnerReference{
+			APIVersion: instance.APIVersion,
+			Kind:       instance.Kind,
+			Name:       instance.Name,
+			UID:        instance.UID,
+			Controller: resources.Ptr(true),
+		}
+		sm.SetOwnerReferences([]metav1.OwnerReference{ownerRef})
+		return nil
+	})
+	return err
 }
 
 // reconcileDelete handles cleanup when the instance is being deleted
