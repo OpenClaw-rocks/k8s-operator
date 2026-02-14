@@ -67,6 +67,7 @@ func BuildStatefulSet(instance *openclawv1alpha1.OpenClawInstance) *appsv1.State
 				},
 				Spec: corev1.PodSpec{
 					ServiceAccountName:            ServiceAccountName(instance),
+					AutomountServiceAccountToken:  Ptr(false),
 					SecurityContext:               buildPodSecurityContext(instance),
 					InitContainers:                buildInitContainers(instance),
 					Containers:                    buildContainers(instance),
@@ -279,6 +280,12 @@ func buildInitContainers(instance *openclawv1alpha1.OpenClawInstance) []corev1.C
 	}
 }
 
+// shellQuote escapes a string for safe use inside single-quoted shell arguments.
+// Single quotes are escaped as '\” (end quote, escaped quote, start quote).
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
+}
+
 // BuildInitScript generates the shell script for the init container.
 // It handles config copy (always overwrite), directory creation (idempotent),
 // and workspace file seeding (only if not present).
@@ -288,7 +295,7 @@ func BuildInitScript(instance *openclawv1alpha1.OpenClawInstance) string {
 
 	// 1. Config copy (always overwrite — operator-managed)
 	if key := configMapKey(instance); key != "" {
-		lines = append(lines, fmt.Sprintf("cp /config/%s /data/openclaw.json", key))
+		lines = append(lines, fmt.Sprintf("cp /config/%s /data/openclaw.json", shellQuote(key)))
 	}
 
 	ws := instance.Spec.Workspace
@@ -300,7 +307,7 @@ func BuildInitScript(instance *openclawv1alpha1.OpenClawInstance) string {
 		copy(dirs, ws.InitialDirectories)
 		sort.Strings(dirs)
 		for _, dir := range dirs {
-			lines = append(lines, fmt.Sprintf("mkdir -p /data/workspace/%s", dir))
+			lines = append(lines, fmt.Sprintf("mkdir -p /data/workspace/%s", shellQuote(dir)))
 		}
 	}
 
@@ -313,7 +320,8 @@ func BuildInitScript(instance *openclawv1alpha1.OpenClawInstance) string {
 		}
 		sort.Strings(files)
 		for _, name := range files {
-			lines = append(lines, fmt.Sprintf("[ -f /data/workspace/%s ] || cp /workspace-init/%s /data/workspace/%s", name, name, name))
+			q := shellQuote(name)
+			lines = append(lines, fmt.Sprintf("[ -f /data/workspace/%s ] || cp /workspace-init/%s /data/workspace/%s", q, q, q))
 		}
 	}
 

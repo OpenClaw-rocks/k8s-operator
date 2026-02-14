@@ -34,6 +34,7 @@ func BuildServiceAccount(instance *openclawv1alpha1.OpenClawInstance) *corev1.Se
 			Namespace: instance.Namespace,
 			Labels:    labels,
 		},
+		AutomountServiceAccountToken: Ptr(false),
 	}
 }
 

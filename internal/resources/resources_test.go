@@ -729,8 +729,8 @@ func TestBuildStatefulSet_ConfigVolume_ConfigMapRef(t *testing.T) {
 	assertVolumeMount(t, initC.VolumeMounts, "data", "/data")
 	assertVolumeMount(t, initC.VolumeMounts, "config", "/config")
 
-	// Verify the command copies the custom key
-	expectedCmd := "cp /config/my-config.json /data/openclaw.json"
+	// Verify the command copies the custom key (shell-quoted)
+	expectedCmd := "cp /config/'my-config.json' /data/openclaw.json"
 	if len(initC.Command) != 3 || initC.Command[2] != expectedCmd {
 		t.Errorf("init container command = %v, want sh -c %q", initC.Command, expectedCmd)
 	}
@@ -760,7 +760,7 @@ func TestBuildStatefulSet_ConfigMapRef_DefaultKey(t *testing.T) {
 	if len(initContainers) != 1 {
 		t.Fatalf("expected 1 init container, got %d", len(initContainers))
 	}
-	expectedCmd := "cp /config/openclaw.json /data/openclaw.json"
+	expectedCmd := "cp /config/'openclaw.json' /data/openclaw.json"
 	if initContainers[0].Command[2] != expectedCmd {
 		t.Errorf("init container command = %q, want %q", initContainers[0].Command[2], expectedCmd)
 	}
@@ -782,6 +782,15 @@ func TestBuildStatefulSet_ServiceAccountName(t *testing.T) {
 	sts := BuildStatefulSet(instance)
 	if sts.Spec.Template.Spec.ServiceAccountName != "sa-test" {
 		t.Errorf("serviceAccountName = %q, want %q", sts.Spec.Template.Spec.ServiceAccountName, "sa-test")
+	}
+}
+
+func TestBuildStatefulSet_AutomountServiceAccountTokenDisabled(t *testing.T) {
+	instance := newTestInstance("automount-test")
+	sts := BuildStatefulSet(instance)
+	token := sts.Spec.Template.Spec.AutomountServiceAccountToken
+	if token == nil || *token != false {
+		t.Errorf("AutomountServiceAccountToken = %v, want false", token)
 	}
 }
 
@@ -1272,6 +1281,14 @@ func TestBuildServiceAccount(t *testing.T) {
 	}
 	if sa.Labels["app.kubernetes.io/managed-by"] != "openclaw-operator" {
 		t.Error("service account missing managed-by label")
+	}
+}
+
+func TestBuildServiceAccount_AutomountDisabled(t *testing.T) {
+	instance := newTestInstance("sa-automount")
+	sa := BuildServiceAccount(instance)
+	if sa.AutomountServiceAccountToken == nil || *sa.AutomountServiceAccountToken != false {
+		t.Errorf("AutomountServiceAccountToken = %v, want false", sa.AutomountServiceAccountToken)
 	}
 }
 
@@ -2611,6 +2628,24 @@ func TestWorkspaceConfigMapName(t *testing.T) {
 // BuildInitScript tests
 // ---------------------------------------------------------------------------
 
+func TestShellQuote(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"simple", "'simple'"},
+		{"it's", "'it'\\''s'"},
+		{"no quotes", "'no quotes'"},
+		{"a'b'c", "'a'\\''b'\\''c'"},
+	}
+	for _, tt := range tests {
+		got := shellQuote(tt.input)
+		if got != tt.want {
+			t.Errorf("shellQuote(%q) = %q, want %q", tt.input, got, tt.want)
+		}
+	}
+}
+
 func TestBuildInitScript_ConfigOnly(t *testing.T) {
 	instance := newTestInstance("init-config-only")
 	instance.Spec.Config.Raw = &openclawv1alpha1.RawConfig{
@@ -2618,7 +2653,7 @@ func TestBuildInitScript_ConfigOnly(t *testing.T) {
 	}
 
 	script := BuildInitScript(instance)
-	if script != "cp /config/openclaw.json /data/openclaw.json" {
+	if script != "cp /config/'openclaw.json' /data/openclaw.json" {
 		t.Errorf("unexpected script:\n%s", script)
 	}
 }
@@ -2633,7 +2668,7 @@ func TestBuildInitScript_WorkspaceOnly(t *testing.T) {
 	}
 
 	script := BuildInitScript(instance)
-	expected := "mkdir -p /data/workspace/memory\n[ -f /data/workspace/SOUL.md ] || cp /workspace-init/SOUL.md /data/workspace/SOUL.md"
+	expected := "mkdir -p /data/workspace/'memory'\n[ -f /data/workspace/'SOUL.md' ] || cp /workspace-init/'SOUL.md' /data/workspace/'SOUL.md'"
 	if script != expected {
 		t.Errorf("unexpected script:\ngot:  %q\nwant: %q", script, expected)
 	}
@@ -2659,19 +2694,19 @@ func TestBuildInitScript_Both(t *testing.T) {
 	if len(lines) != 5 {
 		t.Fatalf("expected 5 lines, got %d:\n%s", len(lines), script)
 	}
-	if lines[0] != "cp /config/openclaw.json /data/openclaw.json" {
+	if lines[0] != "cp /config/'openclaw.json' /data/openclaw.json" {
 		t.Errorf("line 0: %q", lines[0])
 	}
-	if lines[1] != "mkdir -p /data/workspace/memory" {
+	if lines[1] != "mkdir -p /data/workspace/'memory'" {
 		t.Errorf("line 1: %q", lines[1])
 	}
-	if lines[2] != "mkdir -p /data/workspace/tools" {
+	if lines[2] != "mkdir -p /data/workspace/'tools'" {
 		t.Errorf("line 2: %q", lines[2])
 	}
-	if lines[3] != "[ -f /data/workspace/AGENTS.md ] || cp /workspace-init/AGENTS.md /data/workspace/AGENTS.md" {
+	if lines[3] != "[ -f /data/workspace/'AGENTS.md' ] || cp /workspace-init/'AGENTS.md' /data/workspace/'AGENTS.md'" {
 		t.Errorf("line 3: %q", lines[3])
 	}
-	if lines[4] != "[ -f /data/workspace/SOUL.md ] || cp /workspace-init/SOUL.md /data/workspace/SOUL.md" {
+	if lines[4] != "[ -f /data/workspace/'SOUL.md' ] || cp /workspace-init/'SOUL.md' /data/workspace/'SOUL.md'" {
 		t.Errorf("line 4: %q", lines[4])
 	}
 }
@@ -2683,7 +2718,22 @@ func TestBuildInitScript_DirsOnly(t *testing.T) {
 	}
 
 	script := BuildInitScript(instance)
-	expected := "mkdir -p /data/workspace/memory\nmkdir -p /data/workspace/tools/scripts"
+	expected := "mkdir -p /data/workspace/'memory'\nmkdir -p /data/workspace/'tools/scripts'"
+	if script != expected {
+		t.Errorf("unexpected script:\ngot:  %q\nwant: %q", script, expected)
+	}
+}
+
+func TestBuildInitScript_ShellQuotesSpecialChars(t *testing.T) {
+	instance := newTestInstance("init-special")
+	instance.Spec.Workspace = &openclawv1alpha1.WorkspaceSpec{
+		InitialFiles: map[string]string{
+			"it's a file.md": "content",
+		},
+	}
+
+	script := BuildInitScript(instance)
+	expected := "[ -f /data/workspace/'it'\\''s a file.md' ] || cp /workspace-init/'it'\\''s a file.md' /data/workspace/'it'\\''s a file.md'"
 	if script != expected {
 		t.Errorf("unexpected script:\ngot:  %q\nwant: %q", script, expected)
 	}

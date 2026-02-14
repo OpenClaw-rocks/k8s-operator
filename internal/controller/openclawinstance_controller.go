@@ -77,7 +77,7 @@ type OpenClawInstanceReconciler struct {
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch
+// +kubebuilder:rbac:groups=core,resources=secrets,verbs=get
 // +kubebuilder:rbac:groups=core,resources=events,verbs=create;patch
 // +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=get;list;watch;create;update;patch;delete
@@ -311,6 +311,7 @@ func (r *OpenClawInstanceReconciler) reconcileRBAC(ctx context.Context, instance
 			desired := resources.BuildServiceAccount(instance)
 			sa.Labels = desired.Labels
 			sa.Annotations = desired.Annotations
+			sa.AutomountServiceAccountToken = desired.AutomountServiceAccountToken
 			return controllerutil.SetControllerReference(instance, sa, r.Scheme)
 		}); err != nil {
 			return err
