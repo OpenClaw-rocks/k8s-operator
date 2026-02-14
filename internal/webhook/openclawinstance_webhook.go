@@ -131,7 +131,12 @@ func (v *OpenClawInstanceValidator) validate(instance *openclawv1alpha1.OpenClaw
 		warnings = append(warnings, "Resource limits are not fully configured - consider setting both CPU and memory limits")
 	}
 
-	// 9. Validate workspace spec
+	// 9. Warn if using "latest" image tag without a digest pin
+	if instance.Spec.Image.Tag == "latest" && instance.Spec.Image.Digest == "" {
+		warnings = append(warnings, "Image tag \"latest\" is mutable and not recommended for production - consider pinning to a specific version or digest")
+	}
+
+	// 10. Validate workspace spec
 	if instance.Spec.Workspace != nil {
 		if err := validateWorkspaceSpec(instance.Spec.Workspace); err != nil {
 			return nil, err
