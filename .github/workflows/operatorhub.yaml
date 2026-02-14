@@ -67,6 +67,11 @@ jobs:
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Sync fork with upstream to avoid stale-branch CI failures
+          git fetch upstream main
+          git reset --hard upstream/main
+
           git checkout -b "${BRANCH}"
 
           # Copy prepared bundle (mkdir for first-time submissions)

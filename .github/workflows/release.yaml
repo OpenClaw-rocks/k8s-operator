@@ -135,5 +135,6 @@ jobs:
 
       - name: Package and push Helm chart to OCI registry
         run: |
-          helm package charts/openclaw-operator
-          helm push openclaw-operator-${{ steps.version.outputs.version }}.tgz oci://ghcr.io/${{ steps.owner.outputs.name }}/charts
+          VERSION="${{ steps.version.outputs.version }}"
+          helm package charts/openclaw-operator --version "${VERSION}" --app-version "${VERSION}"
+          helm push "openclaw-operator-${VERSION}.tgz" oci://ghcr.io/${{ steps.owner.outputs.name }}/charts
