@@ -87,6 +87,11 @@ func ConfigMapName(instance *openclawv1alpha1.OpenClawInstance) string {
 	return instance.Name + "-config"
 }
 
+// WorkspaceConfigMapName returns the name of the workspace ConfigMap
+func WorkspaceConfigMapName(instance *openclawv1alpha1.OpenClawInstance) string {
+	return instance.Name + "-workspace"
+}
+
 // PVCName returns the name of the PVC
 func PVCName(instance *openclawv1alpha1.OpenClawInstance) string {
 	return instance.Name + "-data"

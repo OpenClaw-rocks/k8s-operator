@@ -727,3 +727,163 @@ func TestValidateCreate_NilAllowPrivilegeEscalation(t *testing.T) {
 		t.Fatalf("expected no privilege escalation warning when nil, got: %v", warnings)
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Workspace validation tests
+// ---------------------------------------------------------------------------
+
+func TestValidateCreate_ValidWorkspace(t *testing.T) {
+	v := &OpenClawInstanceValidator{}
+	instance := newTestInstance()
+	instance.Spec.Workspace = &openclawv1alpha1.WorkspaceSpec{
+		InitialFiles: map[string]string{
+			"SOUL.md":      "personality content",
+			"AGENTS.md":    "agents config",
+			"HEARTBEAT.md": "heartbeat config",
+			"USER.md":      "user config",
+		},
+		InitialDirectories: []string{"memory", "tools/scripts"},
+	}
+
+	_, err := v.ValidateCreate(context.Background(), instance)
+	if err != nil {
+		t.Fatalf("expected no error for valid workspace, got: %v", err)
+	}
+}
+
+func TestValidateCreate_WorkspaceNil(t *testing.T) {
+	v := &OpenClawInstanceValidator{}
+	instance := newTestInstance()
+	instance.Spec.Workspace = nil
+
+	_, err := v.ValidateCreate(context.Background(), instance)
+	if err != nil {
+		t.Fatalf("expected no error with nil workspace, got: %v", err)
+	}
+}
+
+func TestValidateCreate_WorkspaceFileSlash(t *testing.T) {
+	v := &OpenClawInstanceValidator{}
+	instance := newTestInstance()
+	instance.Spec.Workspace = &openclawv1alpha1.WorkspaceSpec{
+		InitialFiles: map[string]string{"sub/file.md": "content"},
+	}
+
+	_, err := v.ValidateCreate(context.Background(), instance)
+	if err == nil {
+		t.Fatal("expected error for filename with '/'")
+	}
+	if !strings.Contains(err.Error(), "/") {
+		t.Fatalf("error should mention '/', got: %v", err)
+	}
+}
+
+func TestValidateCreate_WorkspaceFileBackslash(t *testing.T) {
+	v := &OpenClawInstanceValidator{}
+	instance := newTestInstance()
+	instance.Spec.Workspace = &openclawv1alpha1.WorkspaceSpec{
+		InitialFiles: map[string]string{"file\\name.md": "content"},
+	}
+
+	_, err := v.ValidateCreate(context.Background(), instance)
+	if err == nil {
+		t.Fatal("expected error for filename with '\\'")
+	}
+}
+
+func TestValidateCreate_WorkspaceFileDotDot(t *testing.T) {
+	v := &OpenClawInstanceValidator{}
+	instance := newTestInstance()
+	instance.Spec.Workspace = &openclawv1alpha1.WorkspaceSpec{
+		InitialFiles: map[string]string{"..bad": "content"},
+	}
+
+	_, err := v.ValidateCreate(context.Background(), instance)
+	if err == nil {
+		t.Fatal("expected error for filename with '..'")
+	}
+}
+
+func TestValidateCreate_WorkspaceFileDotPrefix(t *testing.T) {
+	v := &OpenClawInstanceValidator{}
+	instance := newTestInstance()
+	instance.Spec.Workspace = &openclawv1alpha1.WorkspaceSpec{
+		InitialFiles: map[string]string{".hidden": "content"},
+	}
+
+	_, err := v.ValidateCreate(context.Background(), instance)
+	if err == nil {
+		t.Fatal("expected error for filename starting with '.'")
+	}
+}
+
+func TestValidateCreate_WorkspaceFileReservedName(t *testing.T) {
+	v := &OpenClawInstanceValidator{}
+	instance := newTestInstance()
+	instance.Spec.Workspace = &openclawv1alpha1.WorkspaceSpec{
+		InitialFiles: map[string]string{"openclaw.json": "content"},
+	}
+
+	_, err := v.ValidateCreate(context.Background(), instance)
+	if err == nil {
+		t.Fatal("expected error for reserved filename 'openclaw.json'")
+	}
+	if !strings.Contains(err.Error(), "reserved") {
+		t.Fatalf("error should mention reserved, got: %v", err)
+	}
+}
+
+func TestValidateCreate_WorkspaceDirDotDot(t *testing.T) {
+	v := &OpenClawInstanceValidator{}
+	instance := newTestInstance()
+	instance.Spec.Workspace = &openclawv1alpha1.WorkspaceSpec{
+		InitialDirectories: []string{"../escape"},
+	}
+
+	_, err := v.ValidateCreate(context.Background(), instance)
+	if err == nil {
+		t.Fatal("expected error for directory with '..'")
+	}
+}
+
+func TestValidateCreate_WorkspaceDirBackslash(t *testing.T) {
+	v := &OpenClawInstanceValidator{}
+	instance := newTestInstance()
+	instance.Spec.Workspace = &openclawv1alpha1.WorkspaceSpec{
+		InitialDirectories: []string{"dir\\sub"},
+	}
+
+	_, err := v.ValidateCreate(context.Background(), instance)
+	if err == nil {
+		t.Fatal("expected error for directory with '\\'")
+	}
+}
+
+func TestValidateCreate_WorkspaceDirAbsolutePath(t *testing.T) {
+	v := &OpenClawInstanceValidator{}
+	instance := newTestInstance()
+	instance.Spec.Workspace = &openclawv1alpha1.WorkspaceSpec{
+		InitialDirectories: []string{"/etc/shadow"},
+	}
+
+	_, err := v.ValidateCreate(context.Background(), instance)
+	if err == nil {
+		t.Fatal("expected error for absolute path directory")
+	}
+	if !strings.Contains(err.Error(), "absolute") {
+		t.Fatalf("error should mention absolute, got: %v", err)
+	}
+}
+
+func TestValidateCreate_WorkspaceNestedDirAllowed(t *testing.T) {
+	v := &OpenClawInstanceValidator{}
+	instance := newTestInstance()
+	instance.Spec.Workspace = &openclawv1alpha1.WorkspaceSpec{
+		InitialDirectories: []string{"tools/scripts", "memory"},
+	}
+
+	_, err := v.ValidateCreate(context.Background(), instance)
+	if err != nil {
+		t.Fatalf("expected no error for nested directories, got: %v", err)
+	}
+}

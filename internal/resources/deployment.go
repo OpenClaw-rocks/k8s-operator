@@ -21,6 +21,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"sort"
+	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -232,20 +234,34 @@ func buildMainEnv(instance *openclawv1alpha1.OpenClawInstance) []corev1.EnvVar {
 	return append(env, instance.Spec.Env...)
 }
 
-// buildInitContainers creates init containers that seed config into the data volume.
-// Config is copied from the ConfigMap volume so it lives as a regular file on the PVC,
-// allowing the gateway to perform atomic writes (rename) without EBUSY errors.
+// buildInitContainers creates init containers that seed config and workspace
+// files into the data volume. Config is always overwritten (operator-managed),
+// while workspace files use seed-once semantics (only copied if not present).
 func buildInitContainers(instance *openclawv1alpha1.OpenClawInstance) []corev1.Container {
-	key := configMapKey(instance)
-	if key == "" {
+	script := BuildInitScript(instance)
+	if script == "" {
 		return nil
+	}
+
+	mounts := []corev1.VolumeMount{
+		{Name: "data", MountPath: "/data"},
+	}
+
+	// Config volume mount (only if config exists)
+	if configMapKey(instance) != "" {
+		mounts = append(mounts, corev1.VolumeMount{Name: "config", MountPath: "/config"})
+	}
+
+	// Workspace volume mount (only if workspace files exist)
+	if hasWorkspaceFiles(instance) {
+		mounts = append(mounts, corev1.VolumeMount{Name: "workspace-init", MountPath: "/workspace-init", ReadOnly: true})
 	}
 
 	return []corev1.Container{
 		{
 			Name:                     "init-config",
 			Image:                    "busybox:1.37",
-			Command:                  []string{"sh", "-c", fmt.Sprintf("cp /config/%s /data/openclaw.json", key)},
+			Command:                  []string{"sh", "-c", script},
 			ImagePullPolicy:          corev1.PullIfNotPresent,
 			TerminationMessagePath:   corev1.TerminationMessagePathDefault,
 			TerminationMessagePolicy: corev1.TerminationMessageReadFile,
@@ -257,12 +273,59 @@ func buildInitContainers(instance *openclawv1alpha1.OpenClawInstance) []corev1.C
 					Drop: []corev1.Capability{"ALL"},
 				},
 			},
-			VolumeMounts: []corev1.VolumeMount{
-				{Name: "data", MountPath: "/data"},
-				{Name: "config", MountPath: "/config"},
-			},
+			VolumeMounts: mounts,
 		},
 	}
+}
+
+// BuildInitScript generates the shell script for the init container.
+// It handles config copy (always overwrite), directory creation (idempotent),
+// and workspace file seeding (only if not present).
+// Returns "" if there is nothing to do.
+func BuildInitScript(instance *openclawv1alpha1.OpenClawInstance) string {
+	var lines []string
+
+	// 1. Config copy (always overwrite — operator-managed)
+	if key := configMapKey(instance); key != "" {
+		lines = append(lines, fmt.Sprintf("cp /config/%s /data/openclaw.json", key))
+	}
+
+	ws := instance.Spec.Workspace
+
+	// 2. Create workspace directories (idempotent)
+	if ws != nil {
+		// Sort for deterministic output
+		dirs := make([]string, len(ws.InitialDirectories))
+		copy(dirs, ws.InitialDirectories)
+		sort.Strings(dirs)
+		for _, dir := range dirs {
+			lines = append(lines, fmt.Sprintf("mkdir -p /data/workspace/%s", dir))
+		}
+	}
+
+	// 3. Seed workspace files (only if not present)
+	if hasWorkspaceFiles(instance) {
+		// Sort keys for deterministic output
+		files := make([]string, 0, len(ws.InitialFiles))
+		for name := range ws.InitialFiles {
+			files = append(files, name)
+		}
+		sort.Strings(files)
+		for _, name := range files {
+			lines = append(lines, fmt.Sprintf("[ -f /data/workspace/%s ] || cp /workspace-init/%s /data/workspace/%s", name, name, name))
+		}
+	}
+
+	if len(lines) == 0 {
+		return ""
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+// hasWorkspaceFiles returns true if the instance has workspace files to seed.
+func hasWorkspaceFiles(instance *openclawv1alpha1.OpenClawInstance) bool {
+	return instance.Spec.Workspace != nil && len(instance.Spec.Workspace.InitialFiles) > 0
 }
 
 // configMapKey returns the ConfigMap key for the config file, or "" if no config is set.
@@ -384,6 +447,21 @@ func buildVolumes(instance *openclawv1alpha1.OpenClawInstance) []corev1.Volume {
 				ConfigMap: &corev1.ConfigMapVolumeSource{
 					LocalObjectReference: corev1.LocalObjectReference{
 						Name: ConfigMapName(instance),
+					},
+					DefaultMode: &defaultMode,
+				},
+			},
+		})
+	}
+
+	// Workspace init volume (ConfigMap with seed files)
+	if hasWorkspaceFiles(instance) {
+		volumes = append(volumes, corev1.Volume{
+			Name: "workspace-init",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: WorkspaceConfigMapName(instance),
 					},
 					DefaultMode: &defaultMode,
 				},
@@ -612,9 +690,15 @@ func getPullPolicy(instance *openclawv1alpha1.OpenClawInstance) corev1.PullPolic
 	return corev1.PullIfNotPresent
 }
 
-// calculateConfigHash computes a hash of the config for rollout detection
+// calculateConfigHash computes a hash of the config and workspace for rollout detection.
+// Changes to either config or workspace spec trigger a pod restart.
 func calculateConfigHash(instance *openclawv1alpha1.OpenClawInstance) string {
-	data, _ := json.Marshal(instance.Spec.Config)
-	hash := sha256.Sum256(data)
-	return hex.EncodeToString(hash[:8])
+	h := sha256.New()
+	configData, _ := json.Marshal(instance.Spec.Config)
+	h.Write(configData)
+	if instance.Spec.Workspace != nil {
+		wsData, _ := json.Marshal(instance.Spec.Workspace)
+		h.Write(wsData)
+	}
+	return hex.EncodeToString(h.Sum(nil)[:8])
 }

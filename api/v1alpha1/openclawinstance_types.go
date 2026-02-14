@@ -17,6 +17,12 @@ type OpenClawInstanceSpec struct {
 	// +optional
 	Config ConfigSpec `json:"config,omitempty"`
 
+	// Workspace configures initial workspace files seeded into the instance.
+	// Files are copied once on first boot and never overwritten, so agent
+	// modifications survive pod restarts.
+	// +optional
+	Workspace *WorkspaceSpec `json:"workspace,omitempty"`
+
 	// EnvFrom is a list of sources to populate environment variables from
 	// Use this for API keys and other secrets (e.g., ANTHROPIC_API_KEY, OPENAI_API_KEY)
 	// +optional
@@ -122,6 +128,23 @@ type ConfigMapKeySelector struct {
 // +kubebuilder:pruning:PreserveUnknownFields
 type RawConfig struct {
 	runtime.RawExtension `json:",inline"`
+}
+
+// WorkspaceSpec configures initial workspace files for the instance.
+// Files listed in InitialFiles are seeded once (only if they don't already
+// exist on the PVC), so agent modifications survive pod restarts.
+type WorkspaceSpec struct {
+	// InitialFiles maps filenames to their content. Each file is written
+	// to the workspace directory only if it does not already exist.
+	// +kubebuilder:validation:MaxProperties=50
+	// +optional
+	InitialFiles map[string]string `json:"initialFiles,omitempty"`
+
+	// InitialDirectories is a list of directories to create (mkdir -p)
+	// inside the workspace directory. Nested paths like "tools/scripts" are allowed.
+	// +kubebuilder:validation:MaxItems=20
+	// +optional
+	InitialDirectories []string `json:"initialDirectories,omitempty"`
 }
 
 // ResourcesSpec defines compute resource requirements
