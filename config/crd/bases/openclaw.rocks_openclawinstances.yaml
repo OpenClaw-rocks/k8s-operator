@@ -1612,6 +1612,12 @@ spec:
                         type: string
                     type: object
                 type: object
+              restoreFrom:
+                description: |-
+                  RestoreFrom is the B2 backup path to restore data from (e.g. "backups/{tenantId}/{instanceId}/{timestamp}").
+                  When set, the operator restores PVC data from this path before creating the StatefulSet.
+                  Cleared automatically after successful restore.
+                type: string
               security:
                 description: Security specifies security-related configuration
                 properties:
@@ -5189,6 +5195,9 @@ spec:
           status:
             description: OpenClawInstanceStatus defines the observed state of OpenClawInstance
             properties:
+              backupJobName:
+                description: BackupJobName is the name of the active backup Job
+                type: string
               canvasEndpoint:
                 description: CanvasEndpoint is the endpoint for the OpenClaw canvas
                 type: string
@@ -5253,6 +5262,15 @@ spec:
               gatewayEndpoint:
                 description: GatewayEndpoint is the endpoint for the OpenClaw gateway
                 type: string
+              lastBackupPath:
+                description: LastBackupPath is the B2 path of the last successful
+                  backup
+                type: string
+              lastBackupTime:
+                description: LastBackupTime is the timestamp of the last successful
+                  backup
+                format: date-time
+                type: string
               lastReconcileTime:
                 description: LastReconcileTime is the timestamp of the last reconciliation
                 format: date-time
@@ -5307,6 +5325,15 @@ spec:
                 - Degraded
                 - Failed
                 - Terminating
+                - BackingUp
+                - Restoring
+                type: string
+              restoreJobName:
+                description: RestoreJobName is the name of the active restore Job
+                type: string
+              restoredFrom:
+                description: RestoredFrom is the B2 path this instance was restored
+                  from
                 type: string
             type: object
         type: object

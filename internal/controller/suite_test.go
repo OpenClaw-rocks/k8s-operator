@@ -78,9 +78,10 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 
 	err = (&OpenClawInstanceReconciler{
-		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Recorder: mgr.GetEventRecorderFor("openclawinstance-controller"),
+		Client:            mgr.GetClient(),
+		Scheme:            mgr.GetScheme(),
+		Recorder:          mgr.GetEventRecorderFor("openclawinstance-controller"),
+		OperatorNamespace: "default",
 	}).SetupWithManager(mgr)
 	Expect(err).NotTo(HaveOccurred())
 
