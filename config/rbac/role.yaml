@@ -39,6 +39,15 @@ rules:
   resources:
   - deployments
   verbs:
+  - delete
+  - get
+  - list
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - statefulsets
+  verbs:
   - create
   - delete
   - get

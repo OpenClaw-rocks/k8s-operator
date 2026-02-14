@@ -120,13 +120,13 @@ var _ = Describe("OpenClawInstance Controller", func() {
 				return err == nil
 			}, timeout, interval).Should(BeTrue())
 
-			By("Verifying Deployment is created")
+			By("Verifying StatefulSet is created")
 			Eventually(func() bool {
-				dep := &appsv1.Deployment{}
+				sts := &appsv1.StatefulSet{}
 				err := k8sClient.Get(ctx, types.NamespacedName{
-					Name:      resources.DeploymentName(instance),
+					Name:      resources.StatefulSetName(instance),
 					Namespace: "default",
-				}, dep)
+				}, sts)
 				return err == nil
 			}, timeout, interval).Should(BeTrue())
 
@@ -165,7 +165,7 @@ var _ = Describe("OpenClawInstance Controller", func() {
 		})
 	})
 
-	Context("When Deployment security contexts", func() {
+	Context("When StatefulSet security contexts", func() {
 		It("Should enforce non-root execution", func() {
 			instance := &openclawv1alpha1.OpenClawInstance{
 				ObjectMeta: metav1.ObjectMeta{
@@ -175,15 +175,15 @@ var _ = Describe("OpenClawInstance Controller", func() {
 				Spec: openclawv1alpha1.OpenClawInstanceSpec{},
 			}
 
-			deployment := resources.BuildDeployment(instance)
+			sts := resources.BuildStatefulSet(instance)
 
 			// Verify pod security context
-			Expect(deployment.Spec.Template.Spec.SecurityContext).NotTo(BeNil())
-			Expect(*deployment.Spec.Template.Spec.SecurityContext.RunAsNonRoot).To(BeTrue())
-			Expect(*deployment.Spec.Template.Spec.SecurityContext.RunAsUser).To(Equal(int64(1000)))
+			Expect(sts.Spec.Template.Spec.SecurityContext).NotTo(BeNil())
+			Expect(*sts.Spec.Template.Spec.SecurityContext.RunAsNonRoot).To(BeTrue())
+			Expect(*sts.Spec.Template.Spec.SecurityContext.RunAsUser).To(Equal(int64(1000)))
 
 			// Verify container security context
-			container := deployment.Spec.Template.Spec.Containers[0]
+			container := sts.Spec.Template.Spec.Containers[0]
 			Expect(container.SecurityContext).NotTo(BeNil())
 			Expect(*container.SecurityContext.AllowPrivilegeEscalation).To(BeFalse())
 			Expect(container.SecurityContext.Capabilities.Drop).To(ContainElement(corev1.Capability("ALL")))

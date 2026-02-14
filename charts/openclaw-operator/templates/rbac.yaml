@@ -26,8 +26,11 @@ rules:
     verbs: ["create", "patch"]
   # Apps API
   - apiGroups: ["apps"]
-    resources: ["deployments"]
+    resources: ["statefulsets"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch", "delete"]
   # RBAC
   - apiGroups: ["rbac.authorization.k8s.io"]
     resources: ["roles", "rolebindings"]

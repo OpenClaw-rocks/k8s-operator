@@ -633,7 +633,11 @@ type OpenClawInstanceStatus struct {
 
 // ManagedResourcesStatus tracks resources created by the operator
 type ManagedResourcesStatus struct {
-	// Deployment is the name of the managed Deployment
+	// StatefulSet is the name of the managed StatefulSet
+	// +optional
+	StatefulSet string `json:"statefulSet,omitempty"`
+
+	// Deployment is the name of the legacy Deployment (deprecated, used during migration)
 	// +optional
 	Deployment string `json:"deployment,omitempty"`
 
@@ -707,7 +711,10 @@ const (
 	// ConditionTypeConfigValid indicates the configuration is valid
 	ConditionTypeConfigValid = "ConfigValid"
 
-	// ConditionTypeDeploymentReady indicates the Deployment is ready
+	// ConditionTypeStatefulSetReady indicates the StatefulSet is ready
+	ConditionTypeStatefulSetReady = "StatefulSetReady"
+
+	// ConditionTypeDeploymentReady indicates the Deployment is ready (deprecated)
 	ConditionTypeDeploymentReady = "DeploymentReady"
 
 	// ConditionTypeServiceReady indicates the Service is ready

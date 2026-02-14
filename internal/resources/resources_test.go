@@ -168,6 +168,7 @@ func TestNameHelpers(t *testing.T) {
 		fn       func(*openclawv1alpha1.OpenClawInstance) string
 		expected string
 	}{
+		{"StatefulSetName", StatefulSetName, "foo"},
 		{"DeploymentName", DeploymentName, "foo"},
 		{"ServiceName", ServiceName, "foo"},
 		{"RoleName", RoleName, "foo"},
@@ -225,47 +226,53 @@ func TestPtr(t *testing.T) {
 // deployment.go tests
 // ---------------------------------------------------------------------------
 
-func TestBuildDeployment_Defaults(t *testing.T) {
+func TestBuildStatefulSet_Defaults(t *testing.T) {
 	instance := newTestInstance("test-deploy")
-	dep := BuildDeployment(instance)
+	sts := BuildStatefulSet(instance)
 
 	// ObjectMeta
-	if dep.Name != "test-deploy" {
-		t.Errorf("deployment name = %q, want %q", dep.Name, "test-deploy")
+	if sts.Name != "test-deploy" {
+		t.Errorf("statefulset name = %q, want %q", sts.Name, "test-deploy")
 	}
-	if dep.Namespace != "test-ns" {
-		t.Errorf("deployment namespace = %q, want %q", dep.Namespace, "test-ns")
+	if sts.Namespace != "test-ns" {
+		t.Errorf("statefulset namespace = %q, want %q", sts.Namespace, "test-ns")
 	}
 
 	// Labels present
-	if dep.Labels["app.kubernetes.io/name"] != "openclaw" {
-		t.Error("deployment missing app.kubernetes.io/name label")
+	if sts.Labels["app.kubernetes.io/name"] != "openclaw" {
+		t.Error("statefulset missing app.kubernetes.io/name label")
 	}
 
 	// Replicas
-	if dep.Spec.Replicas == nil || *dep.Spec.Replicas != 1 {
-		t.Errorf("replicas = %v, want 1", dep.Spec.Replicas)
+	if sts.Spec.Replicas == nil || *sts.Spec.Replicas != 1 {
+		t.Errorf("replicas = %v, want 1", sts.Spec.Replicas)
 	}
 
-	// Strategy
-	if dep.Spec.Strategy.Type != appsv1.RecreateDeploymentStrategyType {
-		t.Errorf("strategy = %v, want Recreate", dep.Spec.Strategy.Type)
+	// StatefulSet-specific fields
+	if sts.Spec.ServiceName != "test-deploy" {
+		t.Errorf("serviceName = %q, want %q", sts.Spec.ServiceName, "test-deploy")
+	}
+	if sts.Spec.PodManagementPolicy != appsv1.ParallelPodManagement {
+		t.Errorf("podManagementPolicy = %v, want Parallel", sts.Spec.PodManagementPolicy)
+	}
+	if sts.Spec.UpdateStrategy.Type != appsv1.RollingUpdateStatefulSetStrategyType {
+		t.Errorf("updateStrategy = %v, want RollingUpdate", sts.Spec.UpdateStrategy.Type)
 	}
 
 	// Selector labels
-	sel := dep.Spec.Selector.MatchLabels
+	sel := sts.Spec.Selector.MatchLabels
 	if sel["app.kubernetes.io/name"] != "openclaw" || sel["app.kubernetes.io/instance"] != "test-deploy" {
 		t.Error("selector labels do not match expected values")
 	}
 
 	// Config hash annotation
-	ann := dep.Spec.Template.Annotations
+	ann := sts.Spec.Template.Annotations
 	if _, ok := ann["openclaw.rocks/config-hash"]; !ok {
 		t.Error("config-hash annotation missing from pod template")
 	}
 
 	// Pod security context
-	psc := dep.Spec.Template.Spec.SecurityContext
+	psc := sts.Spec.Template.Spec.SecurityContext
 	if psc == nil {
 		t.Fatal("pod security context is nil")
 	}
@@ -286,7 +293,7 @@ func TestBuildDeployment_Defaults(t *testing.T) {
 	}
 
 	// Containers
-	containers := dep.Spec.Template.Spec.Containers
+	containers := sts.Spec.Template.Spec.Containers
 	if len(containers) != 1 {
 		t.Fatalf("expected 1 container, got %d", len(containers))
 	}
@@ -389,7 +396,7 @@ func TestBuildDeployment_Defaults(t *testing.T) {
 	assertVolumeMount(t, main.VolumeMounts, "data", "/home/openclaw/.openclaw")
 
 	// Volumes - default persistence is enabled, so data volume should be PVC
-	volumes := dep.Spec.Template.Spec.Volumes
+	volumes := sts.Spec.Template.Spec.Volumes
 	dataVol := findVolume(volumes, "data")
 	if dataVol == nil {
 		t.Fatal("data volume not found")
@@ -402,12 +409,12 @@ func TestBuildDeployment_Defaults(t *testing.T) {
 	}
 }
 
-func TestBuildDeployment_WithChromium(t *testing.T) {
+func TestBuildStatefulSet_WithChromium(t *testing.T) {
 	instance := newTestInstance("chromium-test")
 	instance.Spec.Chromium.Enabled = true
 
-	dep := BuildDeployment(instance)
-	containers := dep.Spec.Template.Spec.Containers
+	sts := BuildStatefulSet(instance)
+	containers := sts.Spec.Template.Spec.Containers
 
 	if len(containers) != 2 {
 		t.Fatalf("expected 2 containers with chromium enabled, got %d", len(containers))
@@ -484,7 +491,7 @@ func TestBuildDeployment_WithChromium(t *testing.T) {
 	assertVolumeMount(t, chromium.VolumeMounts, "chromium-shm", "/dev/shm")
 
 	// Volumes - check chromium-specific volumes exist
-	volumes := dep.Spec.Template.Spec.Volumes
+	volumes := sts.Spec.Template.Spec.Volumes
 	tmpVol := findVolume(volumes, "chromium-tmp")
 	if tmpVol == nil {
 		t.Fatal("chromium-tmp volume not found")
@@ -512,7 +519,7 @@ func TestBuildDeployment_WithChromium(t *testing.T) {
 	}
 }
 
-func TestBuildDeployment_CustomResources(t *testing.T) {
+func TestBuildStatefulSet_CustomResources(t *testing.T) {
 	instance := newTestInstance("res-test")
 	instance.Spec.Resources = openclawv1alpha1.ResourcesSpec{
 		Requests: openclawv1alpha1.ResourceList{
@@ -525,8 +532,8 @@ func TestBuildDeployment_CustomResources(t *testing.T) {
 		},
 	}
 
-	dep := BuildDeployment(instance)
-	main := dep.Spec.Template.Spec.Containers[0]
+	sts := BuildStatefulSet(instance)
+	main := sts.Spec.Template.Spec.Containers[0]
 
 	cpuReq := main.Resources.Requests[corev1.ResourceCPU]
 	if cpuReq.String() != "1" {
@@ -546,7 +553,7 @@ func TestBuildDeployment_CustomResources(t *testing.T) {
 	}
 }
 
-func TestBuildDeployment_ImageDigest(t *testing.T) {
+func TestBuildStatefulSet_ImageDigest(t *testing.T) {
 	instance := newTestInstance("digest-test")
 	instance.Spec.Image = openclawv1alpha1.ImageSpec{
 		Repository: "my-registry.io/openclaw",
@@ -554,8 +561,8 @@ func TestBuildDeployment_ImageDigest(t *testing.T) {
 		Digest:     "sha256:abcdef1234567890",
 	}
 
-	dep := BuildDeployment(instance)
-	main := dep.Spec.Template.Spec.Containers[0]
+	sts := BuildStatefulSet(instance)
+	main := sts.Spec.Template.Spec.Containers[0]
 
 	expected := "my-registry.io/openclaw@sha256:abcdef1234567890"
 	if main.Image != expected {
@@ -563,7 +570,7 @@ func TestBuildDeployment_ImageDigest(t *testing.T) {
 	}
 }
 
-func TestBuildDeployment_ProbesDisabled(t *testing.T) {
+func TestBuildStatefulSet_ProbesDisabled(t *testing.T) {
 	instance := newTestInstance("probes-disabled")
 	instance.Spec.Probes = openclawv1alpha1.ProbesSpec{
 		Liveness: &openclawv1alpha1.ProbeSpec{
@@ -577,8 +584,8 @@ func TestBuildDeployment_ProbesDisabled(t *testing.T) {
 		},
 	}
 
-	dep := BuildDeployment(instance)
-	main := dep.Spec.Template.Spec.Containers[0]
+	sts := BuildStatefulSet(instance)
+	main := sts.Spec.Template.Spec.Containers[0]
 
 	if main.LivenessProbe != nil {
 		t.Error("liveness probe should be nil when disabled")
@@ -591,7 +598,7 @@ func TestBuildDeployment_ProbesDisabled(t *testing.T) {
 	}
 }
 
-func TestBuildDeployment_CustomProbeValues(t *testing.T) {
+func TestBuildStatefulSet_CustomProbeValues(t *testing.T) {
 	instance := newTestInstance("probes-custom")
 	instance.Spec.Probes = openclawv1alpha1.ProbesSpec{
 		Liveness: &openclawv1alpha1.ProbeSpec{
@@ -602,8 +609,8 @@ func TestBuildDeployment_CustomProbeValues(t *testing.T) {
 		},
 	}
 
-	dep := BuildDeployment(instance)
-	probe := dep.Spec.Template.Spec.Containers[0].LivenessProbe
+	sts := BuildStatefulSet(instance)
+	probe := sts.Spec.Template.Spec.Containers[0].LivenessProbe
 
 	if probe == nil {
 		t.Fatal("liveness probe should not be nil")
@@ -622,12 +629,12 @@ func TestBuildDeployment_CustomProbeValues(t *testing.T) {
 	}
 }
 
-func TestBuildDeployment_PersistenceDisabled(t *testing.T) {
+func TestBuildStatefulSet_PersistenceDisabled(t *testing.T) {
 	instance := newTestInstance("no-pvc")
 	instance.Spec.Storage.Persistence.Enabled = Ptr(false)
 
-	dep := BuildDeployment(instance)
-	volumes := dep.Spec.Template.Spec.Volumes
+	sts := BuildStatefulSet(instance)
+	volumes := sts.Spec.Template.Spec.Volumes
 
 	dataVol := findVolume(volumes, "data")
 	if dataVol == nil {
@@ -641,12 +648,12 @@ func TestBuildDeployment_PersistenceDisabled(t *testing.T) {
 	}
 }
 
-func TestBuildDeployment_ExistingClaim(t *testing.T) {
+func TestBuildStatefulSet_ExistingClaim(t *testing.T) {
 	instance := newTestInstance("existing-pvc")
 	instance.Spec.Storage.Persistence.ExistingClaim = "my-existing-pvc"
 
-	dep := BuildDeployment(instance)
-	volumes := dep.Spec.Template.Spec.Volumes
+	sts := BuildStatefulSet(instance)
+	volumes := sts.Spec.Template.Spec.Volumes
 
 	dataVol := findVolume(volumes, "data")
 	if dataVol == nil {
@@ -660,7 +667,7 @@ func TestBuildDeployment_ExistingClaim(t *testing.T) {
 	}
 }
 
-func TestBuildDeployment_ConfigVolume_RawConfig(t *testing.T) {
+func TestBuildStatefulSet_ConfigVolume_RawConfig(t *testing.T) {
 	instance := newTestInstance("raw-cfg")
 	instance.Spec.Config.Raw = &openclawv1alpha1.RawConfig{
 		RawExtension: runtime.RawExtension{
@@ -668,8 +675,8 @@ func TestBuildDeployment_ConfigVolume_RawConfig(t *testing.T) {
 		},
 	}
 
-	dep := BuildDeployment(instance)
-	main := dep.Spec.Template.Spec.Containers[0]
+	sts := BuildStatefulSet(instance)
+	main := sts.Spec.Template.Spec.Containers[0]
 
 	// Main container should NOT have a config subPath mount (causes EBUSY on rename)
 	for _, vm := range main.VolumeMounts {
@@ -679,7 +686,7 @@ func TestBuildDeployment_ConfigVolume_RawConfig(t *testing.T) {
 	}
 
 	// Init container should copy config from ConfigMap to data volume
-	initContainers := dep.Spec.Template.Spec.InitContainers
+	initContainers := sts.Spec.Template.Spec.InitContainers
 	if len(initContainers) != 1 {
 		t.Fatalf("expected 1 init container, got %d", len(initContainers))
 	}
@@ -691,7 +698,7 @@ func TestBuildDeployment_ConfigVolume_RawConfig(t *testing.T) {
 	assertVolumeMount(t, initC.VolumeMounts, "config", "/config")
 
 	// Should have config volume pointing to managed configmap
-	volumes := dep.Spec.Template.Spec.Volumes
+	volumes := sts.Spec.Template.Spec.Volumes
 	cfgVol := findVolume(volumes, "config")
 	if cfgVol == nil {
 		t.Fatal("config volume not found")
@@ -704,17 +711,17 @@ func TestBuildDeployment_ConfigVolume_RawConfig(t *testing.T) {
 	}
 }
 
-func TestBuildDeployment_ConfigVolume_ConfigMapRef(t *testing.T) {
+func TestBuildStatefulSet_ConfigVolume_ConfigMapRef(t *testing.T) {
 	instance := newTestInstance("ref-cfg")
 	instance.Spec.Config.ConfigMapRef = &openclawv1alpha1.ConfigMapKeySelector{
 		Name: "external-config",
 		Key:  "my-config.json",
 	}
 
-	dep := BuildDeployment(instance)
+	sts := BuildStatefulSet(instance)
 
 	// Init container should copy the custom key from ConfigMap to data volume
-	initContainers := dep.Spec.Template.Spec.InitContainers
+	initContainers := sts.Spec.Template.Spec.InitContainers
 	if len(initContainers) != 1 {
 		t.Fatalf("expected 1 init container, got %d", len(initContainers))
 	}
@@ -729,7 +736,7 @@ func TestBuildDeployment_ConfigVolume_ConfigMapRef(t *testing.T) {
 	}
 
 	// Volume should reference external configmap
-	volumes := dep.Spec.Template.Spec.Volumes
+	volumes := sts.Spec.Template.Spec.Volumes
 	cfgVol := findVolume(volumes, "config")
 	if cfgVol == nil {
 		t.Fatal("config volume not found")
@@ -739,17 +746,17 @@ func TestBuildDeployment_ConfigVolume_ConfigMapRef(t *testing.T) {
 	}
 }
 
-func TestBuildDeployment_ConfigMapRef_DefaultKey(t *testing.T) {
+func TestBuildStatefulSet_ConfigMapRef_DefaultKey(t *testing.T) {
 	instance := newTestInstance("ref-default-key")
 	instance.Spec.Config.ConfigMapRef = &openclawv1alpha1.ConfigMapKeySelector{
 		Name: "external-config",
 		// Key not set - should default to "openclaw.json"
 	}
 
-	dep := BuildDeployment(instance)
+	sts := BuildStatefulSet(instance)
 
 	// Init container should use default key "openclaw.json"
-	initContainers := dep.Spec.Template.Spec.InitContainers
+	initContainers := sts.Spec.Template.Spec.InitContainers
 	if len(initContainers) != 1 {
 		t.Fatalf("expected 1 init container, got %d", len(initContainers))
 	}
@@ -759,34 +766,34 @@ func TestBuildDeployment_ConfigMapRef_DefaultKey(t *testing.T) {
 	}
 }
 
-func TestBuildDeployment_NoConfig_NoInitContainer(t *testing.T) {
+func TestBuildStatefulSet_NoConfig_NoInitContainer(t *testing.T) {
 	instance := newTestInstance("no-config")
 	// No config set at all
 
-	dep := BuildDeployment(instance)
+	sts := BuildStatefulSet(instance)
 
-	if len(dep.Spec.Template.Spec.InitContainers) != 0 {
-		t.Errorf("expected 0 init containers when no config, got %d", len(dep.Spec.Template.Spec.InitContainers))
+	if len(sts.Spec.Template.Spec.InitContainers) != 0 {
+		t.Errorf("expected 0 init containers when no config, got %d", len(sts.Spec.Template.Spec.InitContainers))
 	}
 }
 
-func TestBuildDeployment_ServiceAccountName(t *testing.T) {
+func TestBuildStatefulSet_ServiceAccountName(t *testing.T) {
 	instance := newTestInstance("sa-test")
-	dep := BuildDeployment(instance)
-	if dep.Spec.Template.Spec.ServiceAccountName != "sa-test" {
-		t.Errorf("serviceAccountName = %q, want %q", dep.Spec.Template.Spec.ServiceAccountName, "sa-test")
+	sts := BuildStatefulSet(instance)
+	if sts.Spec.Template.Spec.ServiceAccountName != "sa-test" {
+		t.Errorf("serviceAccountName = %q, want %q", sts.Spec.Template.Spec.ServiceAccountName, "sa-test")
 	}
 }
 
-func TestBuildDeployment_ImagePullSecrets(t *testing.T) {
+func TestBuildStatefulSet_ImagePullSecrets(t *testing.T) {
 	instance := newTestInstance("pull-secrets")
 	instance.Spec.Image.PullSecrets = []corev1.LocalObjectReference{
 		{Name: "my-secret"},
 		{Name: "other-secret"},
 	}
 
-	dep := BuildDeployment(instance)
-	secrets := dep.Spec.Template.Spec.ImagePullSecrets
+	sts := BuildStatefulSet(instance)
+	secrets := sts.Spec.Template.Spec.ImagePullSecrets
 	if len(secrets) != 2 {
 		t.Fatalf("expected 2 pull secrets, got %d", len(secrets))
 	}
@@ -798,7 +805,7 @@ func TestBuildDeployment_ImagePullSecrets(t *testing.T) {
 	}
 }
 
-func TestBuildDeployment_ChromiumCustomImage(t *testing.T) {
+func TestBuildStatefulSet_ChromiumCustomImage(t *testing.T) {
 	instance := newTestInstance("chromium-custom")
 	instance.Spec.Chromium.Enabled = true
 	instance.Spec.Chromium.Image = openclawv1alpha1.ChromiumImageSpec{
@@ -806,11 +813,11 @@ func TestBuildDeployment_ChromiumCustomImage(t *testing.T) {
 		Tag:        "v120",
 	}
 
-	dep := BuildDeployment(instance)
+	sts := BuildStatefulSet(instance)
 	var chromium *corev1.Container
-	for i := range dep.Spec.Template.Spec.Containers {
-		if dep.Spec.Template.Spec.Containers[i].Name == "chromium" {
-			chromium = &dep.Spec.Template.Spec.Containers[i]
+	for i := range sts.Spec.Template.Spec.Containers {
+		if sts.Spec.Template.Spec.Containers[i].Name == "chromium" {
+			chromium = &sts.Spec.Template.Spec.Containers[i]
 			break
 		}
 	}
@@ -822,7 +829,7 @@ func TestBuildDeployment_ChromiumCustomImage(t *testing.T) {
 	}
 }
 
-func TestBuildDeployment_ChromiumDigest(t *testing.T) {
+func TestBuildStatefulSet_ChromiumDigest(t *testing.T) {
 	instance := newTestInstance("chromium-digest")
 	instance.Spec.Chromium.Enabled = true
 	instance.Spec.Chromium.Image = openclawv1alpha1.ChromiumImageSpec{
@@ -831,11 +838,11 @@ func TestBuildDeployment_ChromiumDigest(t *testing.T) {
 		Digest:     "sha256:chromiumhash",
 	}
 
-	dep := BuildDeployment(instance)
+	sts := BuildStatefulSet(instance)
 	var chromium *corev1.Container
-	for i := range dep.Spec.Template.Spec.Containers {
-		if dep.Spec.Template.Spec.Containers[i].Name == "chromium" {
-			chromium = &dep.Spec.Template.Spec.Containers[i]
+	for i := range sts.Spec.Template.Spec.Containers {
+		if sts.Spec.Template.Spec.Containers[i].Name == "chromium" {
+			chromium = &sts.Spec.Template.Spec.Containers[i]
 			break
 		}
 	}
@@ -848,7 +855,7 @@ func TestBuildDeployment_ChromiumDigest(t *testing.T) {
 	}
 }
 
-func TestBuildDeployment_NodeSelectorAndTolerations(t *testing.T) {
+func TestBuildStatefulSet_NodeSelectorAndTolerations(t *testing.T) {
 	instance := newTestInstance("scheduling")
 	instance.Spec.Availability.NodeSelector = map[string]string{
 		"node-type": "gpu",
@@ -862,8 +869,8 @@ func TestBuildDeployment_NodeSelectorAndTolerations(t *testing.T) {
 		},
 	}
 
-	dep := BuildDeployment(instance)
-	podSpec := dep.Spec.Template.Spec
+	sts := BuildStatefulSet(instance)
+	podSpec := sts.Spec.Template.Spec
 
 	if podSpec.NodeSelector["node-type"] != "gpu" {
 		t.Error("nodeSelector not applied")
@@ -873,7 +880,7 @@ func TestBuildDeployment_NodeSelectorAndTolerations(t *testing.T) {
 	}
 }
 
-func TestBuildDeployment_EnvAndEnvFrom(t *testing.T) {
+func TestBuildStatefulSet_EnvAndEnvFrom(t *testing.T) {
 	instance := newTestInstance("env-test")
 	instance.Spec.Env = []corev1.EnvVar{
 		{Name: "MY_VAR", Value: "my-value"},
@@ -886,8 +893,8 @@ func TestBuildDeployment_EnvAndEnvFrom(t *testing.T) {
 		},
 	}
 
-	dep := BuildDeployment(instance)
-	main := dep.Spec.Template.Spec.Containers[0]
+	sts := BuildStatefulSet(instance)
+	main := sts.Spec.Template.Spec.Containers[0]
 
 	if len(main.Env) != 2 || main.Env[0].Name != "HOME" || main.Env[1].Name != "MY_VAR" {
 		t.Error("env vars should include HOME followed by user-defined vars")
@@ -2163,7 +2170,7 @@ func TestAllBuilders_ConsistentLabels(t *testing.T) {
 		name   string
 		labels map[string]string
 	}{
-		{"Deployment", BuildDeployment(instance).Labels},
+		{"Deployment", BuildStatefulSet(instance).Labels},
 		{"Service", BuildService(instance).Labels},
 		{"NetworkPolicy", BuildNetworkPolicy(instance).Labels},
 		{"ServiceAccount", BuildServiceAccount(instance).Labels},
@@ -2203,7 +2210,7 @@ func TestAllBuilders_ConsistentNamespace(t *testing.T) {
 		name      string
 		namespace string
 	}{
-		{"Deployment", BuildDeployment(instance).Namespace},
+		{"Deployment", BuildStatefulSet(instance).Namespace},
 		{"Service", BuildService(instance).Namespace},
 		{"NetworkPolicy", BuildNetworkPolicy(instance).Namespace},
 		{"ServiceAccount", BuildServiceAccount(instance).Namespace},
@@ -2224,7 +2231,7 @@ func TestAllBuilders_ConsistentNamespace(t *testing.T) {
 	}
 }
 
-func TestBuildDeployment_ChromiumCustomResources(t *testing.T) {
+func TestBuildStatefulSet_ChromiumCustomResources(t *testing.T) {
 	instance := newTestInstance("chromium-res")
 	instance.Spec.Chromium.Enabled = true
 	instance.Spec.Chromium.Resources = openclawv1alpha1.ResourcesSpec{
@@ -2238,11 +2245,11 @@ func TestBuildDeployment_ChromiumCustomResources(t *testing.T) {
 		},
 	}
 
-	dep := BuildDeployment(instance)
+	sts := BuildStatefulSet(instance)
 	var chromium *corev1.Container
-	for i := range dep.Spec.Template.Spec.Containers {
-		if dep.Spec.Template.Spec.Containers[i].Name == "chromium" {
-			chromium = &dep.Spec.Template.Spec.Containers[i]
+	for i := range sts.Spec.Template.Spec.Containers {
+		if sts.Spec.Template.Spec.Containers[i].Name == "chromium" {
+			chromium = &sts.Spec.Template.Spec.Containers[i]
 			break
 		}
 	}
@@ -2268,7 +2275,7 @@ func TestBuildDeployment_ChromiumCustomResources(t *testing.T) {
 	}
 }
 
-func TestBuildDeployment_CustomPodSecurityContext(t *testing.T) {
+func TestBuildStatefulSet_CustomPodSecurityContext(t *testing.T) {
 	instance := newTestInstance("custom-psc")
 	instance.Spec.Security.PodSecurityContext = &openclawv1alpha1.PodSecurityContextSpec{
 		RunAsUser:  Ptr(int64(2000)),
@@ -2276,8 +2283,8 @@ func TestBuildDeployment_CustomPodSecurityContext(t *testing.T) {
 		FSGroup:    Ptr(int64(4000)),
 	}
 
-	dep := BuildDeployment(instance)
-	psc := dep.Spec.Template.Spec.SecurityContext
+	sts := BuildStatefulSet(instance)
+	psc := sts.Spec.Template.Spec.SecurityContext
 
 	if *psc.RunAsUser != 2000 {
 		t.Errorf("runAsUser = %d, want 2000", *psc.RunAsUser)
@@ -2294,12 +2301,12 @@ func TestBuildDeployment_CustomPodSecurityContext(t *testing.T) {
 	}
 }
 
-func TestBuildDeployment_CustomPullPolicy(t *testing.T) {
+func TestBuildStatefulSet_CustomPullPolicy(t *testing.T) {
 	instance := newTestInstance("pull-policy")
 	instance.Spec.Image.PullPolicy = corev1.PullAlways
 
-	dep := BuildDeployment(instance)
-	main := dep.Spec.Template.Spec.Containers[0]
+	sts := BuildStatefulSet(instance)
+	main := sts.Spec.Template.Spec.Containers[0]
 
 	if main.ImagePullPolicy != corev1.PullAlways {
 		t.Errorf("pullPolicy = %v, want Always", main.ImagePullPolicy)
@@ -2381,24 +2388,30 @@ func findVolume(volumes []corev1.Volume, name string) *corev1.Volume {
 // Kubernetes default field tests (regression for issue #28 — reconcile loop)
 // ---------------------------------------------------------------------------
 
-// TestBuildDeployment_KubernetesDefaults verifies that the Deployment builder
+// TestBuildStatefulSet_KubernetesDefaults verifies that the StatefulSet builder
 // explicitly sets all fields that Kubernetes would default on the server side.
 // If any of these are missing, controllerutil.CreateOrUpdate sees a diff on
 // every reconcile, causing an endless update loop.
-func TestBuildDeployment_KubernetesDefaults(t *testing.T) {
+func TestBuildStatefulSet_KubernetesDefaults(t *testing.T) {
 	instance := newTestInstance("k8s-defaults")
-	dep := BuildDeployment(instance)
+	sts := BuildStatefulSet(instance)
 
-	// DeploymentSpec defaults
-	if dep.Spec.RevisionHistoryLimit == nil || *dep.Spec.RevisionHistoryLimit != 10 {
-		t.Errorf("RevisionHistoryLimit = %v, want 10", dep.Spec.RevisionHistoryLimit)
+	// StatefulSetSpec defaults
+	if sts.Spec.RevisionHistoryLimit == nil || *sts.Spec.RevisionHistoryLimit != 10 {
+		t.Errorf("RevisionHistoryLimit = %v, want 10", sts.Spec.RevisionHistoryLimit)
 	}
-	if dep.Spec.ProgressDeadlineSeconds == nil || *dep.Spec.ProgressDeadlineSeconds != 600 {
-		t.Errorf("ProgressDeadlineSeconds = %v, want 600", dep.Spec.ProgressDeadlineSeconds)
+	if sts.Spec.ServiceName != "k8s-defaults" {
+		t.Errorf("ServiceName = %q, want %q", sts.Spec.ServiceName, "k8s-defaults")
+	}
+	if sts.Spec.PodManagementPolicy != appsv1.ParallelPodManagement {
+		t.Errorf("PodManagementPolicy = %v, want Parallel", sts.Spec.PodManagementPolicy)
+	}
+	if sts.Spec.UpdateStrategy.Type != appsv1.RollingUpdateStatefulSetStrategyType {
+		t.Errorf("UpdateStrategy = %v, want RollingUpdate", sts.Spec.UpdateStrategy.Type)
 	}
 
 	// PodSpec defaults
-	podSpec := dep.Spec.Template.Spec
+	podSpec := sts.Spec.Template.Spec
 	if podSpec.RestartPolicy != corev1.RestartPolicyAlways {
 		t.Errorf("RestartPolicy = %v, want Always", podSpec.RestartPolicy)
 	}
@@ -2413,7 +2426,7 @@ func TestBuildDeployment_KubernetesDefaults(t *testing.T) {
 	}
 
 	// Container defaults
-	main := dep.Spec.Template.Spec.Containers[0]
+	main := sts.Spec.Template.Spec.Containers[0]
 	if main.TerminationMessagePath != corev1.TerminationMessagePathDefault {
 		t.Errorf("TerminationMessagePath = %q, want %q", main.TerminationMessagePath, corev1.TerminationMessagePathDefault)
 	}
@@ -2433,20 +2446,20 @@ func TestBuildDeployment_KubernetesDefaults(t *testing.T) {
 	}
 }
 
-// TestBuildDeployment_InitContainerDefaults verifies init containers include
+// TestBuildStatefulSet_InitContainerDefaults verifies init containers include
 // Kubernetes default fields to avoid reconcile-loop drift.
-func TestBuildDeployment_InitContainerDefaults(t *testing.T) {
+func TestBuildStatefulSet_InitContainerDefaults(t *testing.T) {
 	instance := newTestInstance("init-defaults")
 	instance.Spec.Config.Raw = &openclawv1alpha1.RawConfig{
 		RawExtension: runtime.RawExtension{Raw: []byte(`{}`)},
 	}
 
-	dep := BuildDeployment(instance)
-	if len(dep.Spec.Template.Spec.InitContainers) == 0 {
+	sts := BuildStatefulSet(instance)
+	if len(sts.Spec.Template.Spec.InitContainers) == 0 {
 		t.Fatal("expected init container when raw config is set")
 	}
 
-	init := dep.Spec.Template.Spec.InitContainers[0]
+	init := sts.Spec.Template.Spec.InitContainers[0]
 	if init.TerminationMessagePath != corev1.TerminationMessagePathDefault {
 		t.Errorf("init container TerminationMessagePath = %q, want %q", init.TerminationMessagePath, corev1.TerminationMessagePathDefault)
 	}
@@ -2458,18 +2471,18 @@ func TestBuildDeployment_InitContainerDefaults(t *testing.T) {
 	}
 }
 
-// TestBuildDeployment_ChromiumContainerDefaults verifies the chromium sidecar
+// TestBuildStatefulSet_ChromiumContainerDefaults verifies the chromium sidecar
 // includes Kubernetes default fields.
-func TestBuildDeployment_ChromiumContainerDefaults(t *testing.T) {
+func TestBuildStatefulSet_ChromiumContainerDefaults(t *testing.T) {
 	instance := newTestInstance("chromium-defaults")
 	instance.Spec.Chromium.Enabled = true
 
-	dep := BuildDeployment(instance)
-	if len(dep.Spec.Template.Spec.Containers) < 2 {
+	sts := BuildStatefulSet(instance)
+	if len(sts.Spec.Template.Spec.Containers) < 2 {
 		t.Fatal("expected chromium sidecar container")
 	}
 
-	chromium := dep.Spec.Template.Spec.Containers[1]
+	chromium := sts.Spec.Template.Spec.Containers[1]
 	if chromium.TerminationMessagePath != corev1.TerminationMessagePathDefault {
 		t.Errorf("chromium TerminationMessagePath = %q, want %q", chromium.TerminationMessagePath, corev1.TerminationMessagePathDefault)
 	}
@@ -2478,16 +2491,16 @@ func TestBuildDeployment_ChromiumContainerDefaults(t *testing.T) {
 	}
 }
 
-// TestBuildDeployment_ConfigMapDefaultMode verifies the ConfigMap volume
+// TestBuildStatefulSet_ConfigMapDefaultMode verifies the ConfigMap volume
 // explicitly sets DefaultMode to match the Kubernetes default (0644).
-func TestBuildDeployment_ConfigMapDefaultMode(t *testing.T) {
+func TestBuildStatefulSet_ConfigMapDefaultMode(t *testing.T) {
 	instance := newTestInstance("cm-default-mode")
 	instance.Spec.Config.Raw = &openclawv1alpha1.RawConfig{
 		RawExtension: runtime.RawExtension{Raw: []byte(`{}`)},
 	}
 
-	dep := BuildDeployment(instance)
-	configVol := findVolume(dep.Spec.Template.Spec.Volumes, "config")
+	sts := BuildStatefulSet(instance)
+	configVol := findVolume(sts.Spec.Template.Spec.Volumes, "config")
 	if configVol == nil {
 		t.Fatal("config volume not found")
 	}
@@ -2510,24 +2523,24 @@ func TestBuildService_KubernetesDefaults(t *testing.T) {
 	}
 }
 
-// TestBuildDeployment_Idempotent verifies calling BuildDeployment twice with
+// TestBuildStatefulSet_Idempotent verifies calling BuildStatefulSet twice with
 // the same input produces identical specs (no random maps, no pointer aliasing
 // issues). This is essential for CreateOrUpdate comparisons to work.
-func TestBuildDeployment_Idempotent(t *testing.T) {
+func TestBuildStatefulSet_Idempotent(t *testing.T) {
 	instance := newTestInstance("idempotent")
 	instance.Spec.Config.Raw = &openclawv1alpha1.RawConfig{
 		RawExtension: runtime.RawExtension{Raw: []byte(`{"key":"val"}`)},
 	}
 	instance.Spec.Chromium.Enabled = true
 
-	dep1 := BuildDeployment(instance)
-	dep2 := BuildDeployment(instance)
+	dep1 := BuildStatefulSet(instance)
+	dep2 := BuildStatefulSet(instance)
 
 	b1, _ := json.Marshal(dep1.Spec)
 	b2, _ := json.Marshal(dep2.Spec)
 
 	if !bytes.Equal(b1, b2) {
-		t.Error("BuildDeployment is not idempotent — two calls with the same input produce different specs")
+		t.Error("BuildStatefulSet is not idempotent — two calls with the same input produce different specs")
 	}
 }
 
@@ -2694,14 +2707,14 @@ func TestConfigHash_ChangesWithWorkspace(t *testing.T) {
 		RawExtension: runtime.RawExtension{Raw: []byte(`{}`)},
 	}
 
-	dep1 := BuildDeployment(instance)
+	dep1 := BuildStatefulSet(instance)
 	hash1 := dep1.Spec.Template.Annotations["openclaw.rocks/config-hash"]
 
 	instance.Spec.Workspace = &openclawv1alpha1.WorkspaceSpec{
 		InitialFiles: map[string]string{"SOUL.md": "hello"},
 	}
 
-	dep2 := BuildDeployment(instance)
+	dep2 := BuildStatefulSet(instance)
 	hash2 := dep2.Spec.Template.Annotations["openclaw.rocks/config-hash"]
 
 	if hash1 == hash2 {
@@ -2715,12 +2728,12 @@ func TestConfigHash_ChangesWithFileContent(t *testing.T) {
 		InitialFiles: map[string]string{"SOUL.md": "v1"},
 	}
 
-	dep1 := BuildDeployment(instance)
+	dep1 := BuildStatefulSet(instance)
 	hash1 := dep1.Spec.Template.Annotations["openclaw.rocks/config-hash"]
 
 	instance.Spec.Workspace.InitialFiles["SOUL.md"] = "v2"
 
-	dep2 := BuildDeployment(instance)
+	dep2 := BuildStatefulSet(instance)
 	hash2 := dep2.Spec.Template.Annotations["openclaw.rocks/config-hash"]
 
 	if hash1 == hash2 {
@@ -2732,7 +2745,7 @@ func TestConfigHash_ChangesWithFileContent(t *testing.T) {
 // Workspace volume and volume mount tests
 // ---------------------------------------------------------------------------
 
-func TestBuildDeployment_WorkspaceVolume(t *testing.T) {
+func TestBuildStatefulSet_WorkspaceVolume(t *testing.T) {
 	instance := newTestInstance("ws-vol")
 	instance.Spec.Config.Raw = &openclawv1alpha1.RawConfig{
 		RawExtension: runtime.RawExtension{Raw: []byte(`{}`)},
@@ -2741,10 +2754,10 @@ func TestBuildDeployment_WorkspaceVolume(t *testing.T) {
 		InitialFiles: map[string]string{"SOUL.md": "hello"},
 	}
 
-	dep := BuildDeployment(instance)
+	sts := BuildStatefulSet(instance)
 
 	// Verify workspace-init volume exists
-	wsVol := findVolume(dep.Spec.Template.Spec.Volumes, "workspace-init")
+	wsVol := findVolume(sts.Spec.Template.Spec.Volumes, "workspace-init")
 	if wsVol == nil {
 		t.Fatal("workspace-init volume not found")
 	}
@@ -2756,26 +2769,26 @@ func TestBuildDeployment_WorkspaceVolume(t *testing.T) {
 	}
 
 	// Verify init container has workspace-init mount
-	init := dep.Spec.Template.Spec.InitContainers[0]
+	init := sts.Spec.Template.Spec.InitContainers[0]
 	assertVolumeMount(t, init.VolumeMounts, "workspace-init", "/workspace-init")
 }
 
-func TestBuildDeployment_NoWorkspaceVolume(t *testing.T) {
+func TestBuildStatefulSet_NoWorkspaceVolume(t *testing.T) {
 	instance := newTestInstance("no-ws-vol")
 	instance.Spec.Config.Raw = &openclawv1alpha1.RawConfig{
 		RawExtension: runtime.RawExtension{Raw: []byte(`{}`)},
 	}
 
-	dep := BuildDeployment(instance)
+	sts := BuildStatefulSet(instance)
 
 	// No workspace-init volume
-	wsVol := findVolume(dep.Spec.Template.Spec.Volumes, "workspace-init")
+	wsVol := findVolume(sts.Spec.Template.Spec.Volumes, "workspace-init")
 	if wsVol != nil {
 		t.Error("workspace-init volume should not exist without workspace files")
 	}
 }
 
-func TestBuildDeployment_WorkspaceDirsOnly_NoVolume(t *testing.T) {
+func TestBuildStatefulSet_WorkspaceDirsOnly_NoVolume(t *testing.T) {
 	instance := newTestInstance("ws-dirs-no-vol")
 	instance.Spec.Config.Raw = &openclawv1alpha1.RawConfig{
 		RawExtension: runtime.RawExtension{Raw: []byte(`{}`)},
@@ -2784,21 +2797,21 @@ func TestBuildDeployment_WorkspaceDirsOnly_NoVolume(t *testing.T) {
 		InitialDirectories: []string{"memory"},
 	}
 
-	dep := BuildDeployment(instance)
+	sts := BuildStatefulSet(instance)
 
 	// Dirs only — no workspace-init volume needed (no files to mount)
-	wsVol := findVolume(dep.Spec.Template.Spec.Volumes, "workspace-init")
+	wsVol := findVolume(sts.Spec.Template.Spec.Volumes, "workspace-init")
 	if wsVol != nil {
 		t.Error("workspace-init volume should not exist with only directories")
 	}
 
 	// But init container should still exist (for mkdir commands)
-	if len(dep.Spec.Template.Spec.InitContainers) == 0 {
+	if len(sts.Spec.Template.Spec.InitContainers) == 0 {
 		t.Fatal("expected init container for workspace directories")
 	}
 }
 
-func TestBuildDeployment_Idempotent_WithWorkspace(t *testing.T) {
+func TestBuildStatefulSet_Idempotent_WithWorkspace(t *testing.T) {
 	instance := newTestInstance("idempotent-ws")
 	instance.Spec.Config.Raw = &openclawv1alpha1.RawConfig{
 		RawExtension: runtime.RawExtension{Raw: []byte(`{"key":"val"}`)},
@@ -2808,13 +2821,13 @@ func TestBuildDeployment_Idempotent_WithWorkspace(t *testing.T) {
 		InitialDirectories: []string{"memory", "tools"},
 	}
 
-	dep1 := BuildDeployment(instance)
-	dep2 := BuildDeployment(instance)
+	dep1 := BuildStatefulSet(instance)
+	dep2 := BuildStatefulSet(instance)
 
 	b1, _ := json.Marshal(dep1.Spec)
 	b2, _ := json.Marshal(dep2.Spec)
 
 	if !bytes.Equal(b1, b2) {
-		t.Error("BuildDeployment with workspace is not idempotent")
+		t.Error("BuildStatefulSet with workspace is not idempotent")
 	}
 }

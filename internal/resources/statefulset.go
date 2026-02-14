@@ -33,26 +33,27 @@ import (
 	openclawv1alpha1 "github.com/openclawrocks/k8s-operator/api/v1alpha1"
 )
 
-// BuildDeployment creates a Deployment for the OpenClawInstance
-func BuildDeployment(instance *openclawv1alpha1.OpenClawInstance) *appsv1.Deployment {
+// BuildStatefulSet creates a StatefulSet for the OpenClawInstance
+func BuildStatefulSet(instance *openclawv1alpha1.OpenClawInstance) *appsv1.StatefulSet {
 	labels := Labels(instance)
 	selectorLabels := SelectorLabels(instance)
 
 	// Calculate config hash for rollout trigger
 	configHash := calculateConfigHash(instance)
 
-	deployment := &appsv1.Deployment{
+	sts := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      DeploymentName(instance),
+			Name:      StatefulSetName(instance),
 			Namespace: instance.Namespace,
 			Labels:    labels,
 		},
-		Spec: appsv1.DeploymentSpec{
-			Replicas:                Ptr(int32(1)), // OpenClaw is single-instance
-			RevisionHistoryLimit:    Ptr(int32(10)),
-			ProgressDeadlineSeconds: Ptr(int32(600)),
-			Strategy: appsv1.DeploymentStrategy{
-				Type: appsv1.RecreateDeploymentStrategyType, // Stateful workload
+		Spec: appsv1.StatefulSetSpec{
+			Replicas:             Ptr(int32(1)), // OpenClaw is single-instance
+			RevisionHistoryLimit: Ptr(int32(10)),
+			ServiceName:          ServiceName(instance),
+			PodManagementPolicy:  appsv1.ParallelPodManagement,
+			UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
+				Type: appsv1.RollingUpdateStatefulSetStrategyType,
 			},
 			Selector: &metav1.LabelSelector{
 				MatchLabels: selectorLabels,
@@ -83,12 +84,12 @@ func BuildDeployment(instance *openclawv1alpha1.OpenClawInstance) *appsv1.Deploy
 	}
 
 	// Add image pull secrets
-	deployment.Spec.Template.Spec.ImagePullSecrets = append(
-		deployment.Spec.Template.Spec.ImagePullSecrets,
+	sts.Spec.Template.Spec.ImagePullSecrets = append(
+		sts.Spec.Template.Spec.ImagePullSecrets,
 		instance.Spec.Image.PullSecrets...,
 	)
 
-	return deployment
+	return sts
 }
 
 // buildPodSecurityContext creates the pod-level security context

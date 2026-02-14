@@ -132,13 +132,13 @@ var _ = Describe("OpenClawInstance Controller", func() {
 				}, createdInstance)
 			}, timeout, interval).Should(Succeed())
 
-			// Verify Deployment is created
-			deployment := &appsv1.Deployment{}
+			// Verify StatefulSet is created
+			statefulSet := &appsv1.StatefulSet{}
 			Eventually(func() error {
 				return k8sClient.Get(ctx, types.NamespacedName{
 					Name:      instanceName,
 					Namespace: namespace,
-				}, deployment)
+				}, statefulSet)
 			}, timeout, interval).Should(Succeed())
 
 			// Verify Service is created
@@ -150,19 +150,19 @@ var _ = Describe("OpenClawInstance Controller", func() {
 				}, service)
 			}, timeout, interval).Should(Succeed())
 
-			// Verify the deployment has the correct image
-			Expect(deployment.Spec.Template.Spec.Containers).To(HaveLen(1))
-			Expect(deployment.Spec.Template.Spec.Containers[0].Image).To(Equal("ghcr.io/openclaw/openclaw:latest"))
+			// Verify the StatefulSet has the correct image
+			Expect(statefulSet.Spec.Template.Spec.Containers).To(HaveLen(1))
+			Expect(statefulSet.Spec.Template.Spec.Containers[0].Image).To(Equal("ghcr.io/openclaw/openclaw:latest"))
 
 			// Clean up
 			Expect(k8sClient.Delete(ctx, instance)).Should(Succeed())
 
-			// Verify the deployment is deleted (due to owner reference)
+			// Verify the StatefulSet is deleted (due to owner reference)
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, types.NamespacedName{
 					Name:      instanceName,
 					Namespace: namespace,
-				}, deployment)
+				}, statefulSet)
 				return err != nil
 			}, timeout, interval).Should(BeTrue())
 		})

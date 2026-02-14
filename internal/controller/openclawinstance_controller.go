@@ -59,7 +59,8 @@ type OpenClawInstanceReconciler struct {
 // +kubebuilder:rbac:groups=openclaw.rocks,resources=openclawinstances,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=openclaw.rocks,resources=openclawinstances/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=openclaw.rocks,resources=openclawinstances/finalizers,verbs=update
-// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;delete
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
@@ -233,11 +234,14 @@ func (r *OpenClawInstanceReconciler) reconcileResources(ctx context.Context, ins
 	}
 	logger.V(1).Info("PodDisruptionBudget reconciled")
 
-	// 6. Reconcile Deployment
-	if err := r.reconcileDeployment(ctx, instance); err != nil {
-		return fmt.Errorf("failed to reconcile Deployment: %w", err)
+	// 6. Migrate Deployment → StatefulSet (if legacy Deployment exists), then reconcile StatefulSet
+	if err := r.migrateDeploymentToStatefulSet(ctx, instance); err != nil {
+		return fmt.Errorf("failed to migrate Deployment to StatefulSet: %w", err)
 	}
-	logger.V(1).Info("Deployment reconciled")
+	if err := r.reconcileStatefulSet(ctx, instance); err != nil {
+		return fmt.Errorf("failed to reconcile StatefulSet: %w", err)
+	}
+	logger.V(1).Info("StatefulSet reconciled")
 
 	// 7. Reconcile Service
 	if err := r.reconcileService(ctx, instance); err != nil {
@@ -527,37 +531,85 @@ func (r *OpenClawInstanceReconciler) reconcilePDB(ctx context.Context, instance 
 	return nil
 }
 
-// reconcileDeployment reconciles the Deployment
-func (r *OpenClawInstanceReconciler) reconcileDeployment(ctx context.Context, instance *openclawv1alpha1.OpenClawInstance) error {
-	deployment := &appsv1.Deployment{
+// migrateDeploymentToStatefulSet detects and deletes a legacy Deployment so
+// the reconciler can create the replacement StatefulSet. This is a one-time
+// migration step — once the Deployment is gone, this function is a no-op.
+func (r *OpenClawInstanceReconciler) migrateDeploymentToStatefulSet(ctx context.Context, instance *openclawv1alpha1.OpenClawInstance) error {
+	logger := log.FromContext(ctx)
+
+	deployment := &appsv1.Deployment{}
+	err := r.Get(ctx, client.ObjectKey{
+		Name:      resources.DeploymentName(instance),
+		Namespace: instance.Namespace,
+	}, deployment)
+	if apierrors.IsNotFound(err) {
+		return nil // already migrated
+	}
+	if err != nil {
+		return err
+	}
+
+	// Safety check: only delete Deployments we own
+	owned := false
+	for _, ref := range deployment.OwnerReferences {
+		if ref.UID == instance.UID {
+			owned = true
+			break
+		}
+	}
+	if !owned {
+		logger.Info("Deployment exists but is not owned by this instance, skipping migration",
+			"deployment", deployment.Name)
+		return nil
+	}
+
+	logger.Info("Migrating from Deployment to StatefulSet, deleting legacy Deployment",
+		"deployment", deployment.Name)
+	if err := r.Delete(ctx, deployment); err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+
+	// Clear legacy status fields
+	instance.Status.ManagedResources.Deployment = ""
+	meta.RemoveStatusCondition(&instance.Status.Conditions, openclawv1alpha1.ConditionTypeDeploymentReady)
+
+	r.Recorder.Event(instance, corev1.EventTypeNormal, "MigrationDeploymentDeleted",
+		"Legacy Deployment deleted, StatefulSet will be created")
+
+	return nil
+}
+
+// reconcileStatefulSet reconciles the StatefulSet
+func (r *OpenClawInstanceReconciler) reconcileStatefulSet(ctx context.Context, instance *openclawv1alpha1.OpenClawInstance) error {
+	sts := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      resources.DeploymentName(instance),
+			Name:      resources.StatefulSetName(instance),
 			Namespace: instance.Namespace,
 		},
 	}
-	if _, err := controllerutil.CreateOrUpdate(ctx, r.Client, deployment, func() error {
-		desired := resources.BuildDeployment(instance)
-		deployment.Labels = desired.Labels
-		deployment.Spec = desired.Spec
-		return controllerutil.SetControllerReference(instance, deployment, r.Scheme)
+	if _, err := controllerutil.CreateOrUpdate(ctx, r.Client, sts, func() error {
+		desired := resources.BuildStatefulSet(instance)
+		sts.Labels = desired.Labels
+		sts.Spec = desired.Spec
+		return controllerutil.SetControllerReference(instance, sts, r.Scheme)
 	}); err != nil {
 		return err
 	}
-	instance.Status.ManagedResources.Deployment = deployment.Name
+	instance.Status.ManagedResources.StatefulSet = sts.Name
 
-	// Check deployment status (deployment already fetched by CreateOrUpdate)
-	ready := deployment.Status.ReadyReplicas > 0
+	// Check StatefulSet status
+	ready := sts.Status.ReadyReplicas > 0
 	status := metav1.ConditionFalse
-	reason := "DeploymentNotReady"
-	message := "Deployment is not ready yet"
+	reason := "StatefulSetNotReady"
+	message := "StatefulSet is not ready yet"
 	if ready {
 		status = metav1.ConditionTrue
-		reason = "DeploymentReady"
-		message = "Deployment is ready"
+		reason = "StatefulSetReady"
+		message = "StatefulSet is ready"
 	}
 
 	meta.SetStatusCondition(&instance.Status.Conditions, metav1.Condition{
-		Type:               openclawv1alpha1.ConditionTypeDeploymentReady,
+		Type:               openclawv1alpha1.ConditionTypeStatefulSetReady,
 		Status:             status,
 		Reason:             reason,
 		Message:            message,
@@ -703,7 +755,8 @@ func (r *OpenClawInstanceReconciler) reconcileDelete(ctx context.Context, instan
 func (r *OpenClawInstanceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&openclawv1alpha1.OpenClawInstance{}).
-		Owns(&appsv1.Deployment{}).
+		Owns(&appsv1.StatefulSet{}).
+		Owns(&appsv1.Deployment{}). // temporary: watch legacy Deployments during migration
 		Owns(&corev1.Service{}).
 		Owns(&corev1.ConfigMap{}).
 		Owns(&corev1.PersistentVolumeClaim{}).

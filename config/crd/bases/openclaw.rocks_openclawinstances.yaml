@@ -5265,7 +5265,8 @@ spec:
                     description: ConfigMap is the name of the managed ConfigMap
                     type: string
                   deployment:
-                    description: Deployment is the name of the managed Deployment
+                    description: Deployment is the name of the legacy Deployment (deprecated,
+                      used during migration)
                     type: string
                   networkPolicy:
                     description: NetworkPolicy is the name of the managed NetworkPolicy
@@ -5287,6 +5288,9 @@ spec:
                     type: string
                   serviceAccount:
                     description: ServiceAccount is the name of the managed ServiceAccount
+                    type: string
+                  statefulSet:
+                    description: StatefulSet is the name of the managed StatefulSet
                     type: string
                 type: object
               observedGeneration:

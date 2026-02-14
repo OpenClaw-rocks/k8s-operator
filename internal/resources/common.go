@@ -54,7 +54,12 @@ func SelectorLabels(instance *openclawv1alpha1.OpenClawInstance) map[string]stri
 	}
 }
 
-// DeploymentName returns the name of the Deployment
+// StatefulSetName returns the name of the StatefulSet
+func StatefulSetName(instance *openclawv1alpha1.OpenClawInstance) string {
+	return instance.Name
+}
+
+// DeploymentName returns the name of the legacy Deployment (used during migration)
 func DeploymentName(instance *openclawv1alpha1.OpenClawInstance) string {
 	return instance.Name
 }
