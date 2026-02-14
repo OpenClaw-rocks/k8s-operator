@@ -116,8 +116,8 @@ func (r *OpenClawInstanceReconciler) getB2Credentials(ctx context.Context) (*b2C
 }
 
 // buildRcloneJob creates a batch/v1 Job that runs rclone to sync data between a PVC and B2.
-// For backup: src=PVC mount, dst=B2 remote path, readOnly=true
-// For restore: src=B2 remote path, dst=PVC mount, readOnly=false
+// For backup: src=PVC mount, dst=B2 remote path
+// For restore: src=B2 remote path, dst=PVC mount
 func buildRcloneJob(
 	name, namespace, pvcName string,
 	b2Path string,
@@ -140,9 +140,6 @@ func buildRcloneJob(
 		// B2 → PVC
 		args = []string{"sync", remotePath, "/data/", "--s3-provider=Other", "--s3-endpoint=$(B2_ENDPOINT)", "--s3-access-key-id=$(B2_KEY_ID)", "--s3-secret-access-key=$(B2_APP_KEY)", "--transfers=8", "--checkers=16", "-v"}
 	}
-
-	// Volume mount: read-only for backup, read-write for restore
-	readOnly := isBackup
 
 	return &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -181,7 +178,6 @@ func buildRcloneJob(
 								{
 									Name:      "data",
 									MountPath: "/data",
-									ReadOnly:  readOnly,
 								},
 							},
 						},
@@ -192,7 +188,6 @@ func buildRcloneJob(
 							VolumeSource: corev1.VolumeSource{
 								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 									ClaimName: pvcName,
-									ReadOnly:  readOnly,
 								},
 							},
 						},

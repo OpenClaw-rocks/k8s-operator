@@ -75,7 +75,7 @@ var _ = Describe("B2 Helpers", func() {
 			}
 		})
 
-		It("Should build a backup Job with read-only PVC mount", func() {
+		It("Should build a backup Job with correct args and SecurityContext", func() {
 			instance := &openclawv1alpha1.OpenClawInstance{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "myinst",
@@ -96,13 +96,15 @@ var _ = Describe("B2 Helpers", func() {
 			Expect(container.Args[0]).To(Equal("sync"))
 			Expect(container.Args[1]).To(Equal("/data/")) // PVC source for backup
 
-			// Verify read-only mount for backup
-			Expect(container.VolumeMounts[0].ReadOnly).To(BeTrue())
+			// Verify SecurityContext
+			podSC := job.Spec.Template.Spec.SecurityContext
+			Expect(*podSC.RunAsUser).To(Equal(int64(1000)))
+			Expect(*podSC.RunAsGroup).To(Equal(int64(1000)))
+			Expect(*podSC.FSGroup).To(Equal(int64(1000)))
 
 			// Verify PVC volume
 			vol := job.Spec.Template.Spec.Volumes[0]
 			Expect(vol.PersistentVolumeClaim.ClaimName).To(Equal("myinst-data"))
-			Expect(vol.PersistentVolumeClaim.ReadOnly).To(BeTrue())
 
 			// Verify env vars
 			var envNames []string
@@ -112,7 +114,7 @@ var _ = Describe("B2 Helpers", func() {
 			Expect(envNames).To(ContainElements("B2_ENDPOINT", "B2_KEY_ID", "B2_APP_KEY"))
 		})
 
-		It("Should build a restore Job with read-write PVC mount", func() {
+		It("Should build a restore Job with B2 as source", func() {
 			instance := &openclawv1alpha1.OpenClawInstance{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "myinst",
@@ -127,11 +129,8 @@ var _ = Describe("B2 Helpers", func() {
 			// For restore, dest is /data/
 			Expect(container.Args[2]).To(Equal("/data/"))
 
-			// Read-write for restore
-			Expect(container.VolumeMounts[0].ReadOnly).To(BeFalse())
-
 			vol := job.Spec.Template.Spec.Volumes[0]
-			Expect(vol.PersistentVolumeClaim.ReadOnly).To(BeFalse())
+			Expect(vol.PersistentVolumeClaim.ClaimName).To(Equal("myinst-data"))
 		})
 	})
 
