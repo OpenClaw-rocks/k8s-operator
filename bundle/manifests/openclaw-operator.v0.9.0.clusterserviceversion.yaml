@@ -1,12 +1,12 @@
 apiVersion: operators.coreos.com/v1alpha1
 kind: ClusterServiceVersion
 metadata:
-  name: openclaw-operator.v0.2.4
+  name: openclaw-operator.v0.9.0
   namespace: placeholder
   annotations:
     capabilities: "Basic Install"
     categories: "AI/Machine Learning"
-    containerImage: ghcr.io/openclaw-rocks/openclaw-operator:v0.2.4
+    containerImage: ghcr.io/openclaw-rocks/openclaw-operator:v0.9.0
     createdAt: "2026-02-11T00:00:00Z"
     support: OpenClaw.rocks
     repository: https://github.com/OpenClaw-rocks/k8s-operator
@@ -140,7 +140,7 @@ spec:
 
     For full documentation, visit [openclaw.rocks/blog/openclaw-kubernetes-operator](https://openclaw.rocks/blog/openclaw-kubernetes-operator).
   maturity: alpha
-  version: 0.2.4
+  version: 0.9.0
   minKubeVersion: 1.28.0
   keywords:
     - ai
@@ -234,7 +234,7 @@ spec:
             x-descriptors:
               - "urn:alm:descriptor:text"
         resources:
-          - kind: Deployment
+          - kind: StatefulSet
             version: v1
           - kind: Service
             version: v1
@@ -291,9 +291,24 @@ spec:
                 - list
                 - watch
             - apiGroups:
+                - ""
+              resources:
+                - pods
+              verbs:
+                - list
+            - apiGroups:
                 - apps
               resources:
                 - deployments
+              verbs:
+                - delete
+                - get
+                - list
+                - watch
+            - apiGroups:
+                - apps
+              resources:
+                - statefulsets
               verbs:
                 - create
                 - delete
@@ -301,6 +316,16 @@ spec:
                 - list
                 - patch
                 - update
+                - watch
+            - apiGroups:
+                - batch
+              resources:
+                - jobs
+              verbs:
+                - create
+                - delete
+                - get
+                - list
                 - watch
             - apiGroups:
                 - monitoring.coreos.com
@@ -425,7 +450,7 @@ spec:
                 terminationGracePeriodSeconds: 10
                 containers:
                   - name: manager
-                    image: ghcr.io/openclaw-rocks/openclaw-operator:v0.2.4
+                    image: ghcr.io/openclaw-rocks/openclaw-operator:v0.9.0
                     command:
                       - /manager
                     args:
