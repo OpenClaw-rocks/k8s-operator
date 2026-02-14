@@ -30,6 +30,8 @@ import (
 	openclawv1alpha1 "github.com/openclawrocks/k8s-operator/api/v1alpha1"
 )
 
+const imageTagLatest = "latest"
+
 // OpenClawInstanceValidator validates OpenClawInstance resources
 type OpenClawInstanceValidator struct{}
 
@@ -132,7 +134,7 @@ func (v *OpenClawInstanceValidator) validate(instance *openclawv1alpha1.OpenClaw
 	}
 
 	// 9. Warn if using "latest" image tag without a digest pin
-	if instance.Spec.Image.Tag == "latest" && instance.Spec.Image.Digest == "" {
+	if instance.Spec.Image.Tag == imageTagLatest && instance.Spec.Image.Digest == "" {
 		warnings = append(warnings, "Image tag \"latest\" is mutable and not recommended for production - consider pinning to a specific version or digest")
 	}
 
@@ -221,7 +223,7 @@ func (d *OpenClawInstanceDefaulter) Default(ctx context.Context, obj runtime.Obj
 		instance.Spec.Image.Repository = "ghcr.io/openclaw/openclaw"
 	}
 	if instance.Spec.Image.Tag == "" && instance.Spec.Image.Digest == "" {
-		instance.Spec.Image.Tag = "latest"
+		instance.Spec.Image.Tag = imageTagLatest
 	}
 	if instance.Spec.Image.PullPolicy == "" {
 		instance.Spec.Image.PullPolicy = corev1.PullIfNotPresent
