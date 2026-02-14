@@ -424,6 +424,49 @@ func TestValidateCreate_WarnsPartialResourceLimits_MissingMemory(t *testing.T) {
 	}
 }
 
+func TestValidateCreate_WarnsLatestImageTag(t *testing.T) {
+	v := &OpenClawInstanceValidator{}
+	instance := newTestInstance()
+	instance.Spec.Image.Tag = "latest"
+
+	warnings, err := v.ValidateCreate(context.Background(), instance)
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if !containsWarning(warnings, "latest") {
+		t.Fatalf("expected warning about latest tag, got: %v", warnings)
+	}
+}
+
+func TestValidateCreate_NoWarnLatestTagWithDigest(t *testing.T) {
+	v := &OpenClawInstanceValidator{}
+	instance := newTestInstance()
+	instance.Spec.Image.Tag = "latest"
+	instance.Spec.Image.Digest = "sha256:abc123"
+
+	warnings, err := v.ValidateCreate(context.Background(), instance)
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if containsWarning(warnings, "latest") {
+		t.Fatalf("expected no latest warning when digest is set, got: %v", warnings)
+	}
+}
+
+func TestValidateCreate_NoWarnSpecificImageTag(t *testing.T) {
+	v := &OpenClawInstanceValidator{}
+	instance := newTestInstance()
+	instance.Spec.Image.Tag = "v1.2.3"
+
+	warnings, err := v.ValidateCreate(context.Background(), instance)
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	if containsWarning(warnings, "latest") {
+		t.Fatalf("expected no latest warning for specific tag, got: %v", warnings)
+	}
+}
+
 func TestValidateCreate_MultipleWarnings(t *testing.T) {
 	v := &OpenClawInstanceValidator{}
 	instance := newTestInstance()
@@ -450,13 +493,16 @@ func TestValidateCreate_MultipleWarnings(t *testing.T) {
 	}
 	// 8. No resource limits
 	instance.Spec.Resources.Limits = openclawv1alpha1.ResourceList{}
+	// 9. Latest image tag
+	instance.Spec.Image.Tag = "latest"
+	instance.Spec.Image.Digest = ""
 
 	warnings, err := v.ValidateCreate(context.Background(), instance)
 	if err != nil {
 		t.Fatalf("expected no error (only warnings), got: %v", err)
 	}
 
-	expectedCount := 8
+	expectedCount := 9
 	if len(warnings) != expectedCount {
 		t.Fatalf("expected %d warnings, got %d: %v", expectedCount, len(warnings), warnings)
 	}
@@ -471,6 +517,7 @@ func TestValidateCreate_MultipleWarnings(t *testing.T) {
 		"environment variables",
 		"allowPrivilegeEscalation",
 		"Resource limits",
+		"latest",
 	}
 	for _, sub := range expectedSubstrings {
 		if !containsWarning(warnings, sub) {
