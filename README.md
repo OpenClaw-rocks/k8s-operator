@@ -41,11 +41,13 @@ The operator reconciles this into a fully managed stack of 9+ Kubernetes resourc
 
 | | Feature | Details |
 |---|---|---|
-| **Declarative** | Single CRD | One resource defines the entire deployment: Deployment, Service, RBAC, NetworkPolicy, PVC, PDB, Ingress, and more |
+| **Declarative** | Single CRD | One resource defines the entire stack: StatefulSet, Service, RBAC, NetworkPolicy, PVC, PDB, Ingress, and more |
 | **Secure** | Hardened by default | Non-root (UID 1000), all capabilities dropped, seccomp RuntimeDefault, default-deny NetworkPolicy, validating webhook |
 | **Observable** | Built-in metrics | Prometheus metrics, ServiceMonitor integration, structured JSON logging, Kubernetes events |
 | **Flexible** | Provider-agnostic config | Use any AI provider (Anthropic, OpenAI, or others) via environment variables and inline or external config |
 | **Resilient** | Self-healing lifecycle | PodDisruptionBudgets, health probes, automatic config rollouts via content hashing, 5-minute drift detection |
+| **Backup/Restore** | B2-backed snapshots | Automatic backup to Backblaze B2 on instance deletion; restore into a new instance from any snapshot |
+| **Workspace Seeding** | Initial files & dirs | Pre-populate the workspace with files and directories before the agent starts |
 | **Extensible** | Chromium sidecar | Optional headless browser for web automation, injected as a hardened sidecar with shared-memory tuning |
 
 ## Architecture
@@ -74,7 +76,7 @@ The operator reconciles this into a fully managed stack of 9+ Kubernetes resourc
 │  ConfigMap        PVC      PDB            ServiceMonitor     │
 │                                                              │
 │  ┌────────────────────────────────────────────────────────┐  │
-│  │  Deployment                                            │  │
+│  │  StatefulSet                                           │  │
 │  │  ┌──────────────────────┐  ┌────────────────────────┐  │  │
 │  │  │  OpenClaw Container  │  │  Chromium Sidecar      │  │  │
 │  │  │  (AI agent runtime)  │  │  (optional, port 9222) │  │  │
@@ -155,8 +157,8 @@ kubectl get openclawinstances
 # my-agent   Running   2m
 
 kubectl get pods
-# NAME                        READY   STATUS    AGE
-# my-agent-7f8b9c6d4-x2k9p   1/1     Running   2m
+# NAME         READY   STATUS    AGE
+# my-agent-0   1/1     Running   2m
 ```
 
 ## Configuration
@@ -234,6 +236,9 @@ When enabled, the operator automatically injects a `CHROMIUM_URL` environment va
 | `spec.observability.metrics.enabled` | Prometheus metrics | `true` |
 | `spec.observability.metrics.serviceMonitor.enabled` | ServiceMonitor | `false` |
 | `spec.availability.podDisruptionBudget.enabled` | PDB | `true` |
+| `spec.workspace.initialFiles` | Files to create in workspace before start | `[]` |
+| `spec.workspace.initialDirectories` | Directories to create in workspace before start | `[]` |
+| `spec.restoreFrom` | B2 backup path to restore workspace from | - |
 
 See the [full example](config/samples/openclaw_v1alpha1_openclawinstance_full.yaml) for every available field, or the [API reference](docs/api-reference.md) for detailed documentation.
 
@@ -247,7 +252,8 @@ The operator follows a **secure-by-default** philosophy. Every instance ships wi
 - **All capabilities dropped**: no ambient Linux capabilities
 - **Seccomp RuntimeDefault**: syscall filtering enabled
 - **Default-deny NetworkPolicy**: only DNS (53) and HTTPS (443) egress allowed; ingress limited to same namespace
-- **Minimal RBAC**: each instance gets its own ServiceAccount with read-only access to its own ConfigMap
+- **Minimal RBAC**: each instance gets its own ServiceAccount with read-only access to its own ConfigMap; operator itself has secrets get-only (no list/watch)
+- **No automatic token mounting**: `automountServiceAccountToken: false` on both ServiceAccounts and pod specs
 - **Read-only root filesystem**: supported for the Chromium sidecar; scratch dirs via emptyDir
 
 ### Validating webhook
@@ -313,7 +319,7 @@ status:
   conditions:
     - type: Ready
       status: "True"
-    - type: DeploymentReady
+    - type: StatefulSetReady
       status: "True"
     - type: NetworkPolicyReady
       status: "True"
@@ -321,7 +327,7 @@ status:
   canvasEndpoint: my-agent.default.svc:18793
 ```
 
-Phases: `Pending` → `Provisioning` → `Running` | `Degraded` | `Failed` | `Terminating`
+Phases: `Pending` → `Restoring` → `Provisioning` → `Running` | `BackingUp` | `Degraded` | `Failed` | `Terminating`
 
 ## Deployment Guides
 
@@ -359,8 +365,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full development guide.
 
 ## Roadmap
 
-- **v0.2.0**: Multi-instance scaling, HPA integration, backup & restore
-- **v0.3.0**: Multi-cluster support, GitOps-native config, cert-manager integration
+- **v0.10+**: Multi-cluster support, HPA integration, cert-manager integration
 - **v1.0.0**: API graduation to v1, conformance test suite, CNCF Artifact Hub listing
 
 See the full [roadmap](ROADMAP.md) for details.
