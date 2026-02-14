@@ -85,11 +85,14 @@ jobs:
 
           # --head requires owner:branch for cross-fork PRs
           FORK_OWNER=$(gh api user --jq '.login')
-          gh pr create \
-            --repo k8s-operatorhub/community-operators \
-            --head "${FORK_OWNER}:${BRANCH}" \
-            --title "operator openclaw-operator (${VERSION})" \
-            --body "$(cat <<EOF
+
+          # Create PR or update existing one (re-runs push new content via --force above)
+          if ! gh pr view "${FORK_OWNER}:${BRANCH}" --repo k8s-operatorhub/community-operators --json state --jq '.state' 2>/dev/null | grep -q OPEN; then
+            gh pr create \
+              --repo k8s-operatorhub/community-operators \
+              --head "${FORK_OWNER}:${BRANCH}" \
+              --title "operator openclaw-operator (${VERSION})" \
+              --body "$(cat <<EOF
           ### Update to openclaw-operator
 
           **Version:** ${VERSION}
@@ -103,3 +106,6 @@ jobs:
           - Container image is published and signed at \`ghcr.io/openclaw-rocks/openclaw-operator:v${VERSION}\`
           EOF
           )"
+          else
+            echo "PR already exists for ${FORK_OWNER}:${BRANCH} — branch was force-pushed with updated content"
+          fi
