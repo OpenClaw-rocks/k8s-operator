@@ -159,6 +159,13 @@ func buildRcloneJob(
 				},
 				Spec: corev1.PodSpec{
 					RestartPolicy: corev1.RestartPolicyOnFailure,
+					// Match the fsGroup/runAsUser from the OpenClaw StatefulSet
+					// so the rclone container can read/write the PVC data
+					SecurityContext: &corev1.PodSecurityContext{
+						RunAsUser:  int64Ptr(1000),
+						RunAsGroup: int64Ptr(1000),
+						FSGroup:    int64Ptr(1000),
+					},
 					Containers: []corev1.Container{
 						{
 							Name:    "rclone",
@@ -194,6 +201,10 @@ func buildRcloneJob(
 			},
 		},
 	}
+}
+
+func int64Ptr(v int64) *int64 {
+	return &v
 }
 
 // backupJobName returns a deterministic name for the backup Job
