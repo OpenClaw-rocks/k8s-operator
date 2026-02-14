@@ -5162,6 +5162,29 @@ spec:
                         type: string
                     type: object
                 type: object
+              workspace:
+                description: |-
+                  Workspace configures initial workspace files seeded into the instance.
+                  Files are copied once on first boot and never overwritten, so agent
+                  modifications survive pod restarts.
+                properties:
+                  initialDirectories:
+                    description: |-
+                      InitialDirectories is a list of directories to create (mkdir -p)
+                      inside the workspace directory. Nested paths like "tools/scripts" are allowed.
+                    items:
+                      type: string
+                    maxItems: 20
+                    type: array
+                  initialFiles:
+                    additionalProperties:
+                      type: string
+                    description: |-
+                      InitialFiles maps filenames to their content. Each file is written
+                      to the workspace directory only if it does not already exist.
+                    maxProperties: 50
+                    type: object
+                type: object
             type: object
           status:
             description: OpenClawInstanceStatus defines the observed state of OpenClawInstance

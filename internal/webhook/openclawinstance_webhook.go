@@ -19,6 +19,7 @@ package webhook
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -130,7 +131,75 @@ func (v *OpenClawInstanceValidator) validate(instance *openclawv1alpha1.OpenClaw
 		warnings = append(warnings, "Resource limits are not fully configured - consider setting both CPU and memory limits")
 	}
 
+	// 9. Validate workspace spec
+	if instance.Spec.Workspace != nil {
+		if err := validateWorkspaceSpec(instance.Spec.Workspace); err != nil {
+			return nil, err
+		}
+	}
+
 	return warnings, nil
+}
+
+// validateWorkspaceSpec validates workspace file and directory names.
+func validateWorkspaceSpec(ws *openclawv1alpha1.WorkspaceSpec) error {
+	for name := range ws.InitialFiles {
+		if err := validateWorkspaceFilename(name); err != nil {
+			return fmt.Errorf("workspace initialFiles key %q: %w", name, err)
+		}
+	}
+	for _, dir := range ws.InitialDirectories {
+		if err := validateWorkspaceDirectory(dir); err != nil {
+			return fmt.Errorf("workspace initialDirectories entry %q: %w", dir, err)
+		}
+	}
+	return nil
+}
+
+// validateWorkspaceFilename checks a single workspace filename.
+func validateWorkspaceFilename(name string) error {
+	if name == "" {
+		return fmt.Errorf("filename must not be empty")
+	}
+	if len(name) > 253 {
+		return fmt.Errorf("filename must be at most 253 characters")
+	}
+	if strings.Contains(name, "/") {
+		return fmt.Errorf("filename must not contain '/'")
+	}
+	if strings.Contains(name, "\\") {
+		return fmt.Errorf("filename must not contain '\\'")
+	}
+	if strings.Contains(name, "..") {
+		return fmt.Errorf("filename must not contain '..'")
+	}
+	if strings.HasPrefix(name, ".") {
+		return fmt.Errorf("filename must not start with '.'")
+	}
+	if name == "openclaw.json" {
+		return fmt.Errorf("filename 'openclaw.json' is reserved for config")
+	}
+	return nil
+}
+
+// validateWorkspaceDirectory checks a single workspace directory path.
+func validateWorkspaceDirectory(dir string) error {
+	if dir == "" {
+		return fmt.Errorf("directory must not be empty")
+	}
+	if len(dir) > 253 {
+		return fmt.Errorf("directory must be at most 253 characters")
+	}
+	if strings.Contains(dir, "\\") {
+		return fmt.Errorf("directory must not contain '\\'")
+	}
+	if strings.Contains(dir, "..") {
+		return fmt.Errorf("directory must not contain '..'")
+	}
+	if strings.HasPrefix(dir, "/") {
+		return fmt.Errorf("directory must not be an absolute path")
+	}
+	return nil
 }
 
 // OpenClawInstanceDefaulter sets defaults for OpenClawInstance resources

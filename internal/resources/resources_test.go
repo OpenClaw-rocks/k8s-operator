@@ -19,6 +19,7 @@ package resources
 import (
 	"bytes"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -2527,5 +2528,293 @@ func TestBuildDeployment_Idempotent(t *testing.T) {
 
 	if !bytes.Equal(b1, b2) {
 		t.Error("BuildDeployment is not idempotent — two calls with the same input produce different specs")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// workspace_configmap.go tests
+// ---------------------------------------------------------------------------
+
+func TestBuildWorkspaceConfigMap_Nil(t *testing.T) {
+	instance := newTestInstance("ws-nil")
+	instance.Spec.Workspace = nil
+
+	cm := BuildWorkspaceConfigMap(instance)
+	if cm != nil {
+		t.Fatal("expected nil ConfigMap when workspace is nil")
+	}
+}
+
+func TestBuildWorkspaceConfigMap_EmptyFiles(t *testing.T) {
+	instance := newTestInstance("ws-empty")
+	instance.Spec.Workspace = &openclawv1alpha1.WorkspaceSpec{
+		InitialDirectories: []string{"memory"},
+	}
+
+	cm := BuildWorkspaceConfigMap(instance)
+	if cm != nil {
+		t.Fatal("expected nil ConfigMap when initialFiles is empty")
+	}
+}
+
+func TestBuildWorkspaceConfigMap_WithFiles(t *testing.T) {
+	instance := newTestInstance("ws-files")
+	instance.Spec.Workspace = &openclawv1alpha1.WorkspaceSpec{
+		InitialFiles: map[string]string{
+			"SOUL.md":   "# Personality\nBe helpful.",
+			"AGENTS.md": "# Agents config",
+		},
+	}
+
+	cm := BuildWorkspaceConfigMap(instance)
+	if cm == nil {
+		t.Fatal("expected non-nil ConfigMap when files are set")
+	}
+	if cm.Name != "ws-files-workspace" {
+		t.Errorf("ConfigMap name = %q, want %q", cm.Name, "ws-files-workspace")
+	}
+	if cm.Namespace != "test-ns" {
+		t.Errorf("ConfigMap namespace = %q, want %q", cm.Namespace, "test-ns")
+	}
+	if len(cm.Data) != 2 {
+		t.Fatalf("expected 2 data entries, got %d", len(cm.Data))
+	}
+	if cm.Data["SOUL.md"] != "# Personality\nBe helpful." {
+		t.Errorf("SOUL.md content mismatch")
+	}
+	if cm.Data["AGENTS.md"] != "# Agents config" {
+		t.Errorf("AGENTS.md content mismatch")
+	}
+}
+
+func TestWorkspaceConfigMapName(t *testing.T) {
+	instance := newTestInstance("foo")
+	if got := WorkspaceConfigMapName(instance); got != "foo-workspace" {
+		t.Errorf("WorkspaceConfigMapName() = %q, want %q", got, "foo-workspace")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// BuildInitScript tests
+// ---------------------------------------------------------------------------
+
+func TestBuildInitScript_ConfigOnly(t *testing.T) {
+	instance := newTestInstance("init-config-only")
+	instance.Spec.Config.Raw = &openclawv1alpha1.RawConfig{
+		RawExtension: runtime.RawExtension{Raw: []byte(`{}`)},
+	}
+
+	script := BuildInitScript(instance)
+	if script != "cp /config/openclaw.json /data/openclaw.json" {
+		t.Errorf("unexpected script:\n%s", script)
+	}
+}
+
+func TestBuildInitScript_WorkspaceOnly(t *testing.T) {
+	instance := newTestInstance("init-ws-only")
+	instance.Spec.Workspace = &openclawv1alpha1.WorkspaceSpec{
+		InitialFiles: map[string]string{
+			"SOUL.md": "content",
+		},
+		InitialDirectories: []string{"memory"},
+	}
+
+	script := BuildInitScript(instance)
+	expected := "mkdir -p /data/workspace/memory\n[ -f /data/workspace/SOUL.md ] || cp /workspace-init/SOUL.md /data/workspace/SOUL.md"
+	if script != expected {
+		t.Errorf("unexpected script:\ngot:  %q\nwant: %q", script, expected)
+	}
+}
+
+func TestBuildInitScript_Both(t *testing.T) {
+	instance := newTestInstance("init-both")
+	instance.Spec.Config.Raw = &openclawv1alpha1.RawConfig{
+		RawExtension: runtime.RawExtension{Raw: []byte(`{}`)},
+	}
+	instance.Spec.Workspace = &openclawv1alpha1.WorkspaceSpec{
+		InitialFiles: map[string]string{
+			"SOUL.md":   "soul",
+			"AGENTS.md": "agents",
+		},
+		InitialDirectories: []string{"memory", "tools"},
+	}
+
+	script := BuildInitScript(instance)
+
+	// Verify all expected lines are present (sorted order)
+	lines := strings.Split(script, "\n")
+	if len(lines) != 5 {
+		t.Fatalf("expected 5 lines, got %d:\n%s", len(lines), script)
+	}
+	if lines[0] != "cp /config/openclaw.json /data/openclaw.json" {
+		t.Errorf("line 0: %q", lines[0])
+	}
+	if lines[1] != "mkdir -p /data/workspace/memory" {
+		t.Errorf("line 1: %q", lines[1])
+	}
+	if lines[2] != "mkdir -p /data/workspace/tools" {
+		t.Errorf("line 2: %q", lines[2])
+	}
+	if lines[3] != "[ -f /data/workspace/AGENTS.md ] || cp /workspace-init/AGENTS.md /data/workspace/AGENTS.md" {
+		t.Errorf("line 3: %q", lines[3])
+	}
+	if lines[4] != "[ -f /data/workspace/SOUL.md ] || cp /workspace-init/SOUL.md /data/workspace/SOUL.md" {
+		t.Errorf("line 4: %q", lines[4])
+	}
+}
+
+func TestBuildInitScript_DirsOnly(t *testing.T) {
+	instance := newTestInstance("init-dirs-only")
+	instance.Spec.Workspace = &openclawv1alpha1.WorkspaceSpec{
+		InitialDirectories: []string{"memory", "tools/scripts"},
+	}
+
+	script := BuildInitScript(instance)
+	expected := "mkdir -p /data/workspace/memory\nmkdir -p /data/workspace/tools/scripts"
+	if script != expected {
+		t.Errorf("unexpected script:\ngot:  %q\nwant: %q", script, expected)
+	}
+}
+
+func TestBuildInitScript_Empty(t *testing.T) {
+	instance := newTestInstance("init-empty")
+	script := BuildInitScript(instance)
+	if script != "" {
+		t.Errorf("expected empty script, got: %q", script)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Config hash includes workspace
+// ---------------------------------------------------------------------------
+
+func TestConfigHash_ChangesWithWorkspace(t *testing.T) {
+	instance := newTestInstance("hash-ws")
+	instance.Spec.Config.Raw = &openclawv1alpha1.RawConfig{
+		RawExtension: runtime.RawExtension{Raw: []byte(`{}`)},
+	}
+
+	dep1 := BuildDeployment(instance)
+	hash1 := dep1.Spec.Template.Annotations["openclaw.rocks/config-hash"]
+
+	instance.Spec.Workspace = &openclawv1alpha1.WorkspaceSpec{
+		InitialFiles: map[string]string{"SOUL.md": "hello"},
+	}
+
+	dep2 := BuildDeployment(instance)
+	hash2 := dep2.Spec.Template.Annotations["openclaw.rocks/config-hash"]
+
+	if hash1 == hash2 {
+		t.Error("config hash should change when workspace is added")
+	}
+}
+
+func TestConfigHash_ChangesWithFileContent(t *testing.T) {
+	instance := newTestInstance("hash-content")
+	instance.Spec.Workspace = &openclawv1alpha1.WorkspaceSpec{
+		InitialFiles: map[string]string{"SOUL.md": "v1"},
+	}
+
+	dep1 := BuildDeployment(instance)
+	hash1 := dep1.Spec.Template.Annotations["openclaw.rocks/config-hash"]
+
+	instance.Spec.Workspace.InitialFiles["SOUL.md"] = "v2"
+
+	dep2 := BuildDeployment(instance)
+	hash2 := dep2.Spec.Template.Annotations["openclaw.rocks/config-hash"]
+
+	if hash1 == hash2 {
+		t.Error("config hash should change when workspace file content changes")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Workspace volume and volume mount tests
+// ---------------------------------------------------------------------------
+
+func TestBuildDeployment_WorkspaceVolume(t *testing.T) {
+	instance := newTestInstance("ws-vol")
+	instance.Spec.Config.Raw = &openclawv1alpha1.RawConfig{
+		RawExtension: runtime.RawExtension{Raw: []byte(`{}`)},
+	}
+	instance.Spec.Workspace = &openclawv1alpha1.WorkspaceSpec{
+		InitialFiles: map[string]string{"SOUL.md": "hello"},
+	}
+
+	dep := BuildDeployment(instance)
+
+	// Verify workspace-init volume exists
+	wsVol := findVolume(dep.Spec.Template.Spec.Volumes, "workspace-init")
+	if wsVol == nil {
+		t.Fatal("workspace-init volume not found")
+	}
+	if wsVol.ConfigMap == nil {
+		t.Fatal("workspace-init volume should use ConfigMap")
+	}
+	if wsVol.ConfigMap.Name != "ws-vol-workspace" {
+		t.Errorf("workspace-init ConfigMap name = %q, want %q", wsVol.ConfigMap.Name, "ws-vol-workspace")
+	}
+
+	// Verify init container has workspace-init mount
+	init := dep.Spec.Template.Spec.InitContainers[0]
+	assertVolumeMount(t, init.VolumeMounts, "workspace-init", "/workspace-init")
+}
+
+func TestBuildDeployment_NoWorkspaceVolume(t *testing.T) {
+	instance := newTestInstance("no-ws-vol")
+	instance.Spec.Config.Raw = &openclawv1alpha1.RawConfig{
+		RawExtension: runtime.RawExtension{Raw: []byte(`{}`)},
+	}
+
+	dep := BuildDeployment(instance)
+
+	// No workspace-init volume
+	wsVol := findVolume(dep.Spec.Template.Spec.Volumes, "workspace-init")
+	if wsVol != nil {
+		t.Error("workspace-init volume should not exist without workspace files")
+	}
+}
+
+func TestBuildDeployment_WorkspaceDirsOnly_NoVolume(t *testing.T) {
+	instance := newTestInstance("ws-dirs-no-vol")
+	instance.Spec.Config.Raw = &openclawv1alpha1.RawConfig{
+		RawExtension: runtime.RawExtension{Raw: []byte(`{}`)},
+	}
+	instance.Spec.Workspace = &openclawv1alpha1.WorkspaceSpec{
+		InitialDirectories: []string{"memory"},
+	}
+
+	dep := BuildDeployment(instance)
+
+	// Dirs only — no workspace-init volume needed (no files to mount)
+	wsVol := findVolume(dep.Spec.Template.Spec.Volumes, "workspace-init")
+	if wsVol != nil {
+		t.Error("workspace-init volume should not exist with only directories")
+	}
+
+	// But init container should still exist (for mkdir commands)
+	if len(dep.Spec.Template.Spec.InitContainers) == 0 {
+		t.Fatal("expected init container for workspace directories")
+	}
+}
+
+func TestBuildDeployment_Idempotent_WithWorkspace(t *testing.T) {
+	instance := newTestInstance("idempotent-ws")
+	instance.Spec.Config.Raw = &openclawv1alpha1.RawConfig{
+		RawExtension: runtime.RawExtension{Raw: []byte(`{"key":"val"}`)},
+	}
+	instance.Spec.Workspace = &openclawv1alpha1.WorkspaceSpec{
+		InitialFiles:       map[string]string{"SOUL.md": "hello", "AGENTS.md": "agents"},
+		InitialDirectories: []string{"memory", "tools"},
+	}
+
+	dep1 := BuildDeployment(instance)
+	dep2 := BuildDeployment(instance)
+
+	b1, _ := json.Marshal(dep1.Spec)
+	b2, _ := json.Marshal(dep2.Spec)
+
+	if !bytes.Equal(b1, b2) {
+		t.Error("BuildDeployment with workspace is not idempotent")
 	}
 }

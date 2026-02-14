@@ -215,6 +215,12 @@ func (r *OpenClawInstanceReconciler) reconcileResources(ctx context.Context, ins
 	}
 	logger.V(1).Info("ConfigMap reconciled")
 
+	// 3b. Reconcile Workspace ConfigMap (seed files for workspace)
+	if err := r.reconcileWorkspaceConfigMap(ctx, instance); err != nil {
+		return fmt.Errorf("failed to reconcile Workspace ConfigMap: %w", err)
+	}
+	logger.V(1).Info("Workspace ConfigMap reconciled")
+
 	// 4. Reconcile PVC
 	if err := r.reconcilePVC(ctx, instance); err != nil {
 		return fmt.Errorf("failed to reconcile PVC: %w", err)
@@ -400,6 +406,39 @@ func (r *OpenClawInstanceReconciler) reconcileConfigMap(ctx context.Context, ins
 		Message:            "ConfigMap created successfully",
 		LastTransitionTime: metav1.Now(),
 	})
+
+	return nil
+}
+
+// reconcileWorkspaceConfigMap reconciles the ConfigMap containing workspace seed files.
+// If the instance has no workspace files, any existing workspace ConfigMap is cleaned up.
+func (r *OpenClawInstanceReconciler) reconcileWorkspaceConfigMap(ctx context.Context, instance *openclawv1alpha1.OpenClawInstance) error {
+	desired := resources.BuildWorkspaceConfigMap(instance)
+
+	if desired == nil {
+		// No workspace files — clean up existing ConfigMap if present
+		existing := &corev1.ConfigMap{}
+		existing.Name = resources.WorkspaceConfigMapName(instance)
+		existing.Namespace = instance.Namespace
+		if err := r.Delete(ctx, existing); err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
+		return nil
+	}
+
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      resources.WorkspaceConfigMapName(instance),
+			Namespace: instance.Namespace,
+		},
+	}
+	if _, err := controllerutil.CreateOrUpdate(ctx, r.Client, cm, func() error {
+		cm.Labels = desired.Labels
+		cm.Data = desired.Data
+		return controllerutil.SetControllerReference(instance, cm, r.Scheme)
+	}); err != nil {
+		return err
+	}
 
 	return nil
 }
