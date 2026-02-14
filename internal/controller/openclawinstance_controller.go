@@ -22,6 +22,7 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -49,11 +50,22 @@ const (
 	RequeueAfter = 5 * time.Minute
 )
 
+// requeueError is a sentinel error used by reconcileResources to signal
+// that a sub-step (like restore) needs to requeue with a specific Result.
+type requeueError struct {
+	Result ctrl.Result
+}
+
+func (e *requeueError) Error() string {
+	return fmt.Sprintf("requeue after %v", e.Result.RequeueAfter)
+}
+
 // OpenClawInstanceReconciler reconciles a OpenClawInstance object
 type OpenClawInstanceReconciler struct {
 	client.Client
-	Scheme   *runtime.Scheme
-	Recorder record.EventRecorder
+	Scheme            *runtime.Scheme
+	Recorder          record.EventRecorder
+	OperatorNamespace string
 }
 
 // +kubebuilder:rbac:groups=openclaw.rocks,resources=openclawinstances,verbs=get;list;watch;create;update;patch;delete
@@ -72,6 +84,8 @@ type OpenClawInstanceReconciler struct {
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=policy,resources=poddisruptionbudgets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;delete
+// +kubebuilder:rbac:groups="",resources=pods,verbs=list
 // +kubebuilder:rbac:groups=monitoring.coreos.com,resources=servicemonitors,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop
@@ -97,7 +111,7 @@ func (r *OpenClawInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 	// Handle deletion
 	if !instance.DeletionTimestamp.IsZero() {
-		return r.reconcileDelete(ctx, instance)
+		return r.reconcileDeleteWithBackup(ctx, instance)
 	}
 
 	// Add finalizer if not present
@@ -129,6 +143,11 @@ func (r *OpenClawInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Req
 
 	// Reconcile all resources
 	if err := r.reconcileResources(ctx, instance); err != nil {
+		// Check if this is a requeue signal (e.g., from restore in progress)
+		if rqErr, ok := err.(*requeueError); ok {
+			return rqErr.Result, nil
+		}
+
 		logger.Error(err, "Failed to reconcile resources")
 		r.Recorder.Event(instance, corev1.EventTypeWarning, "ReconcileFailed", err.Error())
 
@@ -184,7 +203,7 @@ func (r *OpenClawInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Req
 }
 
 func updatePhaseMetric(name, namespace, currentPhase string) {
-	phases := []string{"Pending", "Provisioning", "Running", "Degraded", "Failed", "Terminating"}
+	phases := []string{"Pending", "Provisioning", "Running", "Degraded", "Failed", "Terminating", "BackingUp", "Restoring"}
 	for _, phase := range phases {
 		val := float64(0)
 		if phase == currentPhase {
@@ -227,6 +246,17 @@ func (r *OpenClawInstanceReconciler) reconcileResources(ctx context.Context, ins
 		return fmt.Errorf("failed to reconcile PVC: %w", err)
 	}
 	logger.V(1).Info("PVC reconciled")
+
+	// 4b. Restore from backup if spec.restoreFrom is set (must happen after PVC, before StatefulSet)
+	if result, done, err := r.reconcileRestore(ctx, instance); !done {
+		if err != nil {
+			return fmt.Errorf("failed to reconcile restore: %w", err)
+		}
+		// Restore in progress — return a sentinel error that Reconcile interprets as "requeue with result"
+		// We store the result for the caller to use
+		return &requeueError{Result: result}
+	}
+	logger.V(1).Info("Restore reconciled")
 
 	// 5. Reconcile PodDisruptionBudget
 	if err := r.reconcilePDB(ctx, instance); err != nil {
@@ -727,29 +757,7 @@ func (r *OpenClawInstanceReconciler) reconcileServiceMonitor(ctx context.Context
 	return err
 }
 
-// reconcileDelete handles cleanup when the instance is being deleted
-//
-//nolint:unparam // result is always zero-value but signature kept for consistency with Reconcile return pattern
-func (r *OpenClawInstanceReconciler) reconcileDelete(ctx context.Context, instance *openclawv1alpha1.OpenClawInstance) (ctrl.Result, error) {
-	logger := log.FromContext(ctx)
-	logger.Info("Handling deletion", "instance", instance.Name, "namespace", instance.Namespace)
-
-	// Update phase
-	instance.Status.Phase = openclawv1alpha1.PhaseTerminating
-	if err := r.Status().Update(ctx, instance); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	// Resources are cleaned up automatically via owner references
-	// Just remove the finalizer
-	controllerutil.RemoveFinalizer(instance, FinalizerName)
-	if err := r.Update(ctx, instance); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	logger.Info("Finalizer removed, cleanup complete")
-	return ctrl.Result{}, nil
-}
+// reconcileDelete is superseded by reconcileDeleteWithBackup in backup.go
 
 // SetupWithManager sets up the controller with the Manager
 func (r *OpenClawInstanceReconciler) SetupWithManager(mgr ctrl.Manager) error {
@@ -757,6 +765,7 @@ func (r *OpenClawInstanceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&openclawv1alpha1.OpenClawInstance{}).
 		Owns(&appsv1.StatefulSet{}).
 		Owns(&appsv1.Deployment{}). // temporary: watch legacy Deployments during migration
+		Owns(&batchv1.Job{}).       // backup/restore Jobs
 		Owns(&corev1.Service{}).
 		Owns(&corev1.ConfigMap{}).
 		Owns(&corev1.PersistentVolumeClaim{}).

@@ -72,6 +72,12 @@ type OpenClawInstanceSpec struct {
 	// Availability configures high availability settings
 	// +optional
 	Availability AvailabilitySpec `json:"availability,omitempty"`
+
+	// RestoreFrom is the B2 backup path to restore data from (e.g. "backups/{tenantId}/{instanceId}/{timestamp}").
+	// When set, the operator restores PVC data from this path before creating the StatefulSet.
+	// Cleared automatically after successful restore.
+	// +optional
+	RestoreFrom string `json:"restoreFrom,omitempty"`
 }
 
 // ImageSpec defines the container image configuration
@@ -602,7 +608,7 @@ type PodDisruptionBudgetSpec struct {
 // OpenClawInstanceStatus defines the observed state of OpenClawInstance
 type OpenClawInstanceStatus struct {
 	// Phase represents the current lifecycle phase of the instance
-	// +kubebuilder:validation:Enum=Pending;Provisioning;Running;Degraded;Failed;Terminating
+	// +kubebuilder:validation:Enum=Pending;Provisioning;Running;Degraded;Failed;Terminating;BackingUp;Restoring
 	// +optional
 	Phase string `json:"phase,omitempty"`
 
@@ -629,6 +635,26 @@ type OpenClawInstanceStatus struct {
 	// ManagedResources tracks the resources created by the operator
 	// +optional
 	ManagedResources ManagedResourcesStatus `json:"managedResources,omitempty"`
+
+	// BackupJobName is the name of the active backup Job
+	// +optional
+	BackupJobName string `json:"backupJobName,omitempty"`
+
+	// RestoreJobName is the name of the active restore Job
+	// +optional
+	RestoreJobName string `json:"restoreJobName,omitempty"`
+
+	// LastBackupPath is the B2 path of the last successful backup
+	// +optional
+	LastBackupPath string `json:"lastBackupPath,omitempty"`
+
+	// LastBackupTime is the timestamp of the last successful backup
+	// +optional
+	LastBackupTime *metav1.Time `json:"lastBackupTime,omitempty"`
+
+	// RestoredFrom is the B2 path this instance was restored from
+	// +optional
+	RestoredFrom string `json:"restoredFrom,omitempty"`
 }
 
 // ManagedResourcesStatus tracks resources created by the operator
@@ -728,6 +754,12 @@ const (
 
 	// ConditionTypeStorageReady indicates the PVC is bound
 	ConditionTypeStorageReady = "StorageReady"
+
+	// ConditionTypeBackupComplete indicates the backup completed successfully
+	ConditionTypeBackupComplete = "BackupComplete"
+
+	// ConditionTypeRestoreComplete indicates the restore completed successfully
+	ConditionTypeRestoreComplete = "RestoreComplete"
 )
 
 // Phase constants
@@ -738,4 +770,6 @@ const (
 	PhaseDegraded     = "Degraded"
 	PhaseFailed       = "Failed"
 	PhaseTerminating  = "Terminating"
+	PhaseBackingUp    = "BackingUp"
+	PhaseRestoring    = "Restoring"
 )
